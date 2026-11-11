@@ -5,8 +5,8 @@ from xml.etree import ElementTree
 ROOT = Path(__file__).resolve().parents[1]
 class ReleaseManifestTests(unittest.TestCase):
     def test_windows_icon_is_source_configured(self):
-        proj = (ROOT/'src/OTSSecuritySuite.Desktop/OTSSecuritySuite.Desktop.csproj').read_text()
-        xaml = (ROOT/'src/OTSSecuritySuite.Desktop/MainWindow.xaml').read_text()
+        proj = (ROOT/'src/OTSSecuritySuite.Desktop/OTSSecuritySuite.Desktop.csproj').read_text(encoding="utf-8")
+        xaml = (ROOT/'src/OTSSecuritySuite.Desktop/MainWindow.xaml').read_text(encoding="utf-8")
         self.assertIn('<ApplicationIcon>AppIcon.ico</ApplicationIcon>',proj)
         self.assertIn('Icon="AppIcon.ico"',xaml)
         self.assertTrue((ROOT/'src/OTSSecuritySuite.Desktop/AppIcon.ico').is_file())
@@ -15,11 +15,11 @@ class ReleaseManifestTests(unittest.TestCase):
         for f in (ROOT/'src/OTSSecuritySuite.Desktop').glob('*.xaml'):
             ElementTree.parse(f)
     def test_extension_manifest_valid(self):
-        m = json.loads((ROOT/'extension/manifest.json').read_text())
+        m = json.loads((ROOT/'extension/manifest.json').read_text(encoding="utf-8"))
         self.assertEqual(m['manifest_version'],3)
-        self.assertNotIn('http://127.0.0.1:48728', (ROOT/'extension/popup.js').read_text())
+        self.assertNotIn('http://127.0.0.1:48728', (ROOT/'extension/popup.js').read_text(encoding="utf-8"))
     def test_submodule_locations(self):
-        m = (ROOT/'.gitmodules').read_text()
+        m = (ROOT/'.gitmodules').read_text(encoding="utf-8")
         self.assertIn('OTS_W.H.I.T.E.',m)
         self.assertIn('OTS_System_Santizer',m)
 if __name__=='__main__': unittest.main()
