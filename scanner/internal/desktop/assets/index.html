@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#090b0b"><title>OTS / GitHub Malware Scanner</title><link rel="icon" type="image/png" href="/favicon.png?v=2.5.0"><link rel="manifest" href="/manifest.webmanifest"><link rel="stylesheet" href="/styles.css"></head>
+<body>
+<div class="shell">
+ <nav class="topbar" aria-label="Primary navigation">
+  <div class="topbar-inner">
+   <div class="brand"><img class="brand-logo" src="/ohana-logo.png?v=2.5.0" alt="Ohana Tech Solutions"><div class="brand-copy"><strong>GITHUB MALWARE SCANNER</strong><small>OHANA TECH SOLUTIONS</small></div></div>
+   <div class="navitems"><button class="navitem active" data-tab="scan">SCAN REPO</button><button class="navitem" data-tab="history">HISTORY</button><button class="navitem" data-tab="about">ABOUT</button></div>
+   <div class="engine-status"><span class="dot"></span> LOCAL ENGINE <span class="live-word">ONLINE</span></div>
+  </div>
+ </nav>
+ <main>
+  <section id="scan" class="panel active">
+    <div class="hero">
+    <div class="scan-card">
+      <div class="tabs"><button class="scan-mode active" data-mode="repo">REPOSITORY URL</button><button class="scan-mode" data-mode="folder">LOCAL PATH</button><button class="scan-mode" data-mode="upload">FOLDER UPLOAD</button><button class="scan-mode" data-mode="file">FILE UPLOAD</button></div>
+      <div class="field-area">
+       <div class="mode" id="repo-mode"><label for="repoUrl">PASTE A PUBLIC GITHUB OR BITBUCKET URL</label><div class="input-row"><span class="input-prompt">&gt;</span><input id="repoUrl" spellcheck="false" placeholder="github.com/owner/repository" autocomplete="off"><button class="primary" id="scanRepo">SCAN REPO <span>▶</span></button></div><p class="hint">Source snapshot analysis · Scanned by your local OTS engine</p></div>
+       <div class="mode hidden" id="folder-mode"><label for="folderPath">ENTER A LOCAL FILE OR FOLDER PATH</label><div class="input-row"><span class="input-prompt">&gt;</span><input id="folderPath" spellcheck="false" placeholder="C:\Users\You\Downloads\repository"><button class="primary" id="scanFolder">SCAN PATH <span>▶</span></button></div><p class="hint">Offline inspection from your computer</p></div>
+       <div class="mode hidden" id="upload-mode"><label for="folderUpload">SELECT A LOCAL FOLDER</label><div class="input-row file-input"><input type="file" id="folderUpload" webkitdirectory directory multiple><button class="primary" id="scanUpload">SCAN FOLDER <span>▶</span></button></div><p class="hint">Selected files are sent to the local engine on this device; upload limit 240 MB</p></div>
+       <div class="mode hidden" id="file-mode"><label for="fileUpload">SELECT LOCAL FILES</label><div class="input-row file-input"><input type="file" id="fileUpload" multiple><button class="primary" id="scanFiles">SCAN FILES <span>▶</span></button></div><p class="hint">Inspect one or multiple files without running them</p></div>
+      </div>
+    </div>
+    <div class="feature-strip"><span><b>95</b> DETECTION RULES</span><span><b>12</b> RISK CATEGORIES</span><span><b>0–100</b> RISK SCORE</span><span><b>LOCAL</b> ANALYSIS</span></div>
+    </div>
+    <div class="status hidden" id="status"><span class="spinner"></span><span id="statusText">Scanning…</span></div>
+    <div class="error hidden" id="error"></div>
+    <section id="results" class="hidden results-wrap">
+      <div class="section-heading"><div><p class="eyebrow">SCAN REPORT // 01</p><h2 id="resultTarget"></h2></div><button class="secondary" id="export">↓ EXPORT JSON</button></div>
+      <div class="stats"><div class="stat score"><small>RISK SCORE</small><div id="resultScore">0<span>/100</span></div><b id="resultVerdict">LOW RISK</b></div><div class="stat"><small>FILES INSPECTED</small><div id="filesScanned">0</div><p id="filesSkipped">0 uninspected</p></div><div class="stat"><small>FINDINGS</small><div id="findingCount">0</div><p id="coverage">Detection matches</p></div><div class="stat"><small>ACTIVE RULES</small><div id="ruleCount">95</div><p>Local analysis checks</p></div></div>
+      <details id="scanNotes" class="scan-notes hidden"><summary id="scanNotesLabel">Scan details</summary><ul id="scanDiagnostics"></ul></details>
+      <div class="results-grid"><div class="result-surface"><div class="section-heading small"><h3>RISK CATEGORIES</h3><span class="decor">░▒▓</span></div><div id="categories"></div></div><div class="result-surface"><div class="section-heading small"><h3>DETECTION FINDINGS</h3><select id="categoryFilter"><option value="all">All categories</option></select></div><div class="findings" id="findings"></div></div></div>
+      <div class="coverage-section"><div class="section-heading small"><h3>FILE COVERAGE AUDIT</h3><span id="coverageNote" class="hint">Inspection status by file</span></div><div class="coverage-metrics" id="coverageMetrics"></div><div class="input-row coverage-controls"><input type="search" id="fileSearch" placeholder="Filter files or types" aria-label="Filter coverage entries"><select id="fileStatus" aria-label="Filter by inspection status"><option value="all">All statuses</option><option value="complete">Complete baseline</option><option value="partial">Partial</option><option value="uninspected">Uninspected</option></select></div><div class="coverage-list" id="coverageList"></div><p id="coverageCount" class="hint"></p></div>
+    </section>
+    <section id="empty" class="hidden" aria-hidden="true"></section>
+  </section>
+  <section id="history" class="panel secondary-panel"><p class="eyebrow">LOCAL REPORTS // 02</p><h2>SCAN HISTORY<span class="cursor">_</span></h2><p class="subtitle">Previous reports, stored on this computer.</p><div id="historyList" class="history-list"></div></section>
+  <section id="about" class="panel secondary-panel"><p class="eyebrow">THE ENGINE // 03</p><h2>ABOUT OTS SCANNER<span class="cursor">_</span></h2><div class="about-card"><h3>INDEPENDENT LOCAL ANALYSIS</h3><p>Built by Ohana Tech Solutions. OTS GitHub Malware Scanner is independently developed, is not affiliated with ScanRepo, and does not require its services.</p><p>Supported scans inspect source files and file signatures without executing untrusted code. For each report, file coverage details identify which checks completed and which content could not be fully inspected. Static indicators help identify patterns; they are not a guarantee of safety.</p><h3>PRIVACY & SECURITY</h3><p>Local folder scans stay on this computer. Public repository scans retrieve snapshots from GitHub or Bitbucket. Reports are stored locally. The interface runs on a loopback connection with session authorization.</p></div></section>
+  <footer><span>© 2026 OHANA TECH SOLUTIONS</span><span>GITHUB MALWARE SCANNER // LOCAL EDITION</span><span>V2.4.0</span></footer>
+ </main>
+</div><script src="/app.js"></script></body></html>
