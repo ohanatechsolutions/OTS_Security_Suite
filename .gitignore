@@ -1,0 +1,13 @@
+/bundle/
+/artifacts/
+/dist/
+/build/
+**/bin/
+**/obj/
+*.user
+*.log
+__pycache__/
+*.pyc
+*.spec
+scanner/release/
+scanner/cmd/installer/payload/*.exe
