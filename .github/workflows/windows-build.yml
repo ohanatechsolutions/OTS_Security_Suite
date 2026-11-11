@@ -1,8 +1,6 @@
 name: OTS Security Suite — Windows build and integration checks
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
 permissions:
   contents: read
 jobs:
