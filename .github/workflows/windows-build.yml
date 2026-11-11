@@ -53,7 +53,9 @@ jobs:
           python -m PyInstaller --noconfirm --clean --onefile --console --name OTSWhiteAudit --paths modules/OTS_WHITE tools/white_entry.py
           if ($LASTEXITCODE -ne 0) { throw 'W.H.I.T.E. build failed' }
           Copy-Item dist/OTSWhiteAudit.exe bundle/engines/
-          python -m unittest discover -s modules/OTS_WHITE/tests -p 'test_*.py'
+          Push-Location modules/OTS_WHITE
+          python -m unittest discover -s tests -p 'test_*.py'
+          Pop-Location
           if ($LASTEXITCODE -ne 0) { throw 'W.H.I.T.E. tests failed' }
       - name: Build System Sanitizer and smoke tests
         shell: pwsh
