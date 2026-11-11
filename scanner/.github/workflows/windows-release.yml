@@ -1,0 +1,31 @@
+name: Windows Build & Tests
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+          cache: true
+      - name: Test scanner engine
+        run: go test ./internal/engine ./internal/desktop
+      - name: Build local scanner, installer, and uninstaller
+        shell: pwsh
+        run: ./build-windows.ps1
+      - name: Static verification
+        shell: pwsh
+        run: |
+          if (!(Test-Path 'release/OTS-GitHub-Malware-Scanner-Setup.exe')) { throw 'Installer missing' }
+          Get-FileHash release/*.exe -Algorithm SHA256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OTS-GitHub-Malware-Scanner-Windows-unsigned
+          path: release/*.exe
+          if-no-files-found: error

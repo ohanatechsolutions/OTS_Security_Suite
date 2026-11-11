@@ -1,0 +1,6 @@
+/release/*.exe
+/release/*.txt
+/cmd/installer/payload/*
+!/cmd/installer/payload/.gitkeep
+*.log
+.DS_Store
