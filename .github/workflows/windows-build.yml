@@ -82,6 +82,52 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Installer build failed' }
           New-Item -ItemType Directory -Force artifacts | Out-Null
           Get-FileHash artifacts/*.exe -Algorithm SHA256 | ForEach-Object { "$($_.Hash)  $(Split-Path -Leaf $_.Path)" } | Set-Content artifacts/SHA256SUMS.txt
+      - name: Smoke test installed Windows suite and local engine
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $engine = (Resolve-Path 'bundle/engines/OTSScannerEngine.exe').Path
+          $out = Join-Path $env:TEMP 'ots-suite-engine-stdout.txt'
+          $err = Join-Path $env:TEMP 'ots-suite-engine-stderr.txt'
+          $proc = Start-Process -FilePath $engine -ArgumentList @('--no-browser','--ephemeral','--print-url') -PassThru -RedirectStandardOutput $out -RedirectStandardError $err -WindowStyle Hidden
+          try {
+            $url = ''
+            for ($i=0; $i -lt 40; $i++) {
+              Start-Sleep -Milliseconds 250
+              if (Test-Path $out) {
+                $line = Get-Content $out -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($line -like 'OTS_SCAN_URL=http://127.0.0.1:*') { $url = $line.Substring(13); break }
+              }
+              if ($proc.HasExited) { throw 'Scanner engine exited before becoming ready' }
+            }
+            if (-not $url) { throw 'Scanner engine failed to report a session URL' }
+            $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+            $response = Invoke-WebRequest -Uri $url -WebSession $session -MaximumRedirection 4
+            if ($response.StatusCode -ne 200) { throw 'Engine session page inaccessible' }
+            $origin = ([uri]$url).GetLeftPart([System.UriPartial]::Authority)
+            $info = Invoke-RestMethod -Uri "$origin/api/info" -WebSession $session
+            if ($info.rule_count -lt 95) { throw 'Unexpected scanner rule count' }
+            Write-Host "Go engine session and $($info.rule_count) rules verified"
+          }
+          finally {
+            if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+          }
+          $installer = (Resolve-Path 'artifacts/OTS-Security-Suite-Setup-x64.exe').Path
+          $setup = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-') -Wait -PassThru
+          if ($setup.ExitCode -ne 0) { throw "Silent setup failed: exit $($setup.ExitCode)" }
+          $installPath = Join-Path $env:LOCALAPPDATA 'Programs/Ohana Tech Solutions/Security Suite'
+          foreach ($required in @('OTSSecuritySuite.exe','engines/OTSScannerEngine.exe','engines/OTSWhiteAudit.exe','engines/OTSSystemSanitizer.exe')) {
+            if (-not (Test-Path (Join-Path $installPath $required))) { throw "Installer missing $required" }
+          }
+          Add-Type -AssemblyName System.Drawing
+          $icon = [System.Drawing.Icon]::ExtractAssociatedIcon((Join-Path $installPath 'OTSSecuritySuite.exe'))
+          if ($null -eq $icon) { throw 'Native host icon is missing' }
+          $icon.Dispose()
+          $uninstall = Join-Path $installPath 'unins000.exe'
+          if (-not (Test-Path $uninstall)) { throw 'Inno uninstaller is missing' }
+          $remove = Start-Process -FilePath $uninstall -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
+          if ($remove.ExitCode -ne 0) { throw "Silent uninstall failed: exit $($remove.ExitCode)" }
+          Write-Host 'Installer, bundled modules, icon and uninstaller smoke checks passed'
       - name: Upload Windows installer (unsigned test build)
         uses: actions/upload-artifact@v4
         with:
