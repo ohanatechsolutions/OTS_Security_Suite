@@ -14,8 +14,7 @@ public partial class MainWindow : Window
 {
     private Process? _engine;
     private CancellationTokenSource? _scanCancellation;
-    private CancellationTokenSource? _whiteAuditCancellation;
-    private Process? _whiteAuditProcess;
+    private readonly WhiteAuditRunner _whiteAuditRunner = new();
     private readonly QuarantineService _quarantine = new();
     private readonly HashSet<string> _reviewed = new(StringComparer.Ordinal);
     private readonly string _engineDirectory = Path.Combine(AppContext.BaseDirectory, "engines");
@@ -130,8 +129,7 @@ public partial class MainWindow : Window
     {
         _isClosing = true;
         _scanCancellation?.Cancel();
-        _whiteAuditCancellation?.Cancel();
-        StopWhiteAuditProcess();
+        _whiteAuditRunner.Cancel();
         StopEngine();
     }
     private void SetPanel(Grid selected)
@@ -149,58 +147,23 @@ public partial class MainWindow : Window
         var d = new OpenFolderDialog { Title = "Choose a local repository for W.H.I.T.E." };
         if (d.ShowDialog(this) == true) WhiteFolder.Text = d.FolderName;
     }
-    private void StopWhiteAuditProcess()
-    {
-        try
-        {
-            if (_whiteAuditProcess is { HasExited: false })
-                _whiteAuditProcess.Kill(entireProcessTree: true);
-        }
-        catch (InvalidOperationException) { } // Already exited.
-        catch (System.ComponentModel.Win32Exception) { } // OS denied termination.
-    }
-
-    private async Task<string> ReadBoundedAuditOutputAsync(StreamReader reader, int maxCharacters, CancellationToken cancellation)
-    {
-        var builder = new StringBuilder();
-        var buffer = new char[8192];
-        while (true)
-        {
-            int count = await reader.ReadAsync(buffer.AsMemory(), cancellation).ConfigureAwait(false);
-            if (count == 0) return builder.ToString();
-            if (count > maxCharacters - builder.Length)
-            {
-                // Do not let untrusted repository findings or broken CLI diagnostics grow without bound.
-                StopWhiteAuditProcess();
-                throw new InvalidDataException("Audit engine output exceeded its safe size limit.");
-            }
-            builder.Append(buffer, 0, count);
-        }
-    }
-
     private void CancelWhiteAudit(object sender, RoutedEventArgs e)
     {
-        if (_whiteAuditCancellation is null) return;
+        if (!_whiteAuditRunner.IsRunning) return;
         WhiteStatus.Text = "Cancelling audit...";
-        _whiteAuditCancellation.Cancel();
-        StopWhiteAuditProcess();
+        _whiteAuditRunner.Cancel();
     }
 
     private async void RunWhiteAudit(object sender, RoutedEventArgs e)
     {
-        // Only one child audit may own this window at any time.
-        if (_whiteAuditCancellation is not null) return;
+        if (_whiteAuditRunner.IsRunning) return;
         var target = WhiteFolder.Text.Trim();
         if (!Directory.Exists(target)) { WhiteStatus.Text = "Choose an existing local repository folder."; return; }
         string binary = Path.Combine(_engineDirectory, "OTSWhiteAudit.exe");
         if (!File.Exists(binary)) { WhiteStatus.Text = "W.H.I.T.E. audit engine missing from installation."; return; }
 
-        _lastWhiteOutput = null; // Never export a stale report after a failed/cancelled run.
+        _lastWhiteOutput = null;
         WhiteOutput.Clear();
-        using var cancellation = new CancellationTokenSource();
-        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(12));
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token, timeout.Token);
-        _whiteAuditCancellation = cancellation;
         WhiteRun.IsEnabled = false;
         WhiteCancel.IsEnabled = true;
         WhiteStatus.Text = "Auditing source and configuration...";
@@ -215,63 +178,37 @@ public partial class MainWindow : Window
             psi.ArgumentList.Add("--format"); psi.ArgumentList.Add("json");
             if (HistoryScan.IsChecked == true) psi.ArgumentList.Add("--history");
             if (DependencyScan.IsChecked != true) psi.ArgumentList.Add("--no-sca");
-            using var process = Process.Start(psi) ?? throw new InvalidOperationException("Audit engine could not start.");
-            _whiteAuditProcess = process;
-            try
+
+            var execution = await _whiteAuditRunner.RunAsync(psi, TimeSpan.FromMinutes(12));
+            if (_isClosing) return;
+            if (execution.ExitCode is not (0 or 1 or 2))
             {
-                // Drain both pipes simultaneously to avoid child-process output deadlocks.
-                var stdout = ReadBoundedAuditOutputAsync(process.StandardOutput, 16 * 1024 * 1024, linked.Token);
-                var stderr = ReadBoundedAuditOutputAsync(process.StandardError, 128 * 1024, linked.Token);
-                await process.WaitForExitAsync(linked.Token);
-                string output = await stdout;
-                await stderr; // Drain for child liveness; do not display potentially sensitive raw stderr.
-                linked.Token.ThrowIfCancellationRequested();
-                if (_isClosing) return;
-                if (string.IsNullOrWhiteSpace(output))
-                {
-                    WhiteStatus.Text = "Audit returned no JSON report. Check the audit configuration and retry.";
-                    return;
-                }
-                using (var report = System.Text.Json.JsonDocument.Parse(output))
-                {
-                    if (report.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object)
-                        throw new InvalidDataException("Audit output did not contain a JSON report object.");
-                }
-                if (process.ExitCode is not (0 or 1 or 2))
-                {
-                    WhiteStatus.Text = "Audit engine failed (exit " + process.ExitCode + "); no report is exportable.";
-                    return;
-                }
-                _lastWhiteOutput = output;
-                WhiteOutput.Text = output;
-                WhiteStatus.Text = process.ExitCode switch {
-                    0 => "Audit completed · no findings at the configured failure threshold",
-                    1 => "Audit completed · findings require review",
-                    2 => "Audit incomplete · review the report and configuration",
-                    _ => "Audit exited with status " + process.ExitCode
-                };
+                WhiteStatus.Text = "Audit engine failed (exit " + execution.ExitCode + "); no report is exportable.";
+                return;
             }
-            finally
+            if (string.IsNullOrWhiteSpace(execution.StandardOutput))
             {
-                // Timeout, user cancellation, window close and abnormal exit all reap the child.
-                StopWhiteAuditProcess();
-                _whiteAuditProcess = null;
+                WhiteStatus.Text = "Audit returned no JSON report. Check the audit configuration and retry.";
+                return;
             }
+            using (var document = System.Text.Json.JsonDocument.Parse(execution.StandardOutput))
+            {
+                if (document.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object)
+                    throw new InvalidDataException("Audit output did not contain a JSON report object.");
+            }
+            _lastWhiteOutput = execution.StandardOutput;
+            WhiteOutput.Text = execution.StandardOutput;
+            WhiteStatus.Text = execution.ExitCode switch {
+                0 => "Audit completed · no findings at the configured failure threshold",
+                1 => "Audit completed · findings require review",
+                _ => "Audit incomplete · review the report and configuration"
+            };
         }
-        catch (OperationCanceledException)
-        {
-            if (!_isClosing)
-                WhiteStatus.Text = timeout.IsCancellationRequested
-                    ? "Audit timed out after 12 minutes; termination requested."
-                    : "Audit cancelled; termination requested.";
-        }
-        catch (Exception ex)
-        {
-            if (!_isClosing) WhiteStatus.Text = "Audit could not finish: " + ex.Message;
-        }
+        catch (TimeoutException) { if (!_isClosing) WhiteStatus.Text = "Audit timed out after 12 minutes; termination requested."; }
+        catch (OperationCanceledException) { if (!_isClosing) WhiteStatus.Text = "Audit cancelled; termination requested."; }
+        catch (Exception ex) { if (!_isClosing) WhiteStatus.Text = "Audit could not finish: " + ex.Message; }
         finally
         {
-            _whiteAuditCancellation = null;
             if (!_isClosing)
             {
                 WhiteRun.IsEnabled = true;
@@ -279,6 +216,7 @@ public partial class MainWindow : Window
             }
         }
     }
+
     private void ExportWhiteReport(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrEmpty(_lastWhiteOutput)) { WhiteStatus.Text = "Run an audit before exporting."; return; }
