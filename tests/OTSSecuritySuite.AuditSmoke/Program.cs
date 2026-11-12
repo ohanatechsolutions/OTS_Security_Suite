@@ -12,6 +12,8 @@ var cases = new (string Name, Func<Task> Action)[]
     ("stderr overflow terminates process", StderrOverflow),
     ("only one concurrent audit is allowed", PreventDuplicates),
     ("invalid shell and nonredirected process rejected", RejectUnsafeConfiguration),
+    ("report export is atomic and preserves old JSON on invalid input", AtomicJsonExport),
+    ("report export rejects absent directory and cleans temp output", ExportFailureCleanly),
 };
 int passed = 0;
 foreach (var (name, action) in cases)
@@ -127,6 +129,56 @@ static async Task RejectUnsafeConfiguration()
     var invalid = new ProcessStartInfo("powershell.exe") { UseShellExecute = true };
     await Expect<ArgumentException>(runner.RunAsync(invalid, TimeSpan.FromSeconds(10)));
     Assert(!runner.IsRunning, "Invalid configuration left runner busy");
+}
+
+static Task AtomicJsonExport()
+{
+    var root = Path.Combine(Path.GetTempPath(), "ots-report-test-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    try
+    {
+        var file = Path.Combine(root, "report.json");
+        WhiteReportWriter.Save(file, "{\"complete\":true}");
+        Assert(File.ReadAllText(file) == "{\"complete\":true}", "Valid JSON was not saved");
+        try
+        {
+            WhiteReportWriter.Save(file, "NOT JSON");
+            throw new Exception("Invalid report was accepted");
+        }
+        catch (System.Text.Json.JsonException) { }
+        Assert(File.ReadAllText(file) == "{\"complete\":true}", "Invalid JSON overwrote the existing report");
+        try
+        {
+            WhiteReportWriter.Save(file, "[]");
+            throw new Exception("Non-object JSON was accepted");
+        }
+        catch (InvalidDataException) { }
+        Assert(Directory.GetFiles(root).Length == 1, "Atomic export leaked a temporary file");
+    }
+    finally { Directory.Delete(root, recursive: true); }
+    return Task.CompletedTask;
+}
+
+static Task ExportFailureCleanly()
+{
+    var root = Path.Combine(Path.GetTempPath(), "ots-report-test-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    try
+    {
+        var existing = Path.Combine(root, "existing.json");
+        File.WriteAllText(existing, "{\"original\":true}");
+        var absent = Path.Combine(root, "missing", "report.json");
+        try
+        {
+            WhiteReportWriter.Save(absent, "{\"new\":true}");
+            throw new Exception("Write into a missing directory was accepted");
+        }
+        catch (DirectoryNotFoundException) { }
+        Assert(File.ReadAllText(existing) == "{\"original\":true}", "Failed export damaged other report");
+        Assert(Directory.GetFiles(root).Length == 1, "Failed export leaked temporary output");
+    }
+    finally { Directory.Delete(root, recursive: true); }
+    return Task.CompletedTask;
 }
 
 static async Task<int> WaitForPid(WhiteAuditRunner runner)
