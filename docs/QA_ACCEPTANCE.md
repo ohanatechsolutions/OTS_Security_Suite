@@ -39,3 +39,5 @@
 | Release / publisher owner | — | — | PENDING | — |
 
 **Release decision:** NO-GO until all release-critical blockers are closed with evidence. N/A: payments, hosted SaaS, mobile, IoT, and AI/LLM components (not part of V1).
+
+**New pending automation (source `a2f39b812e61`):** 15 intended C# subprocess/report/dual-vault/review-identity test cases; browser cancellation, cross-origin denial and TAR-budget Go fixtures; packaged WPF synthetic GUI automation; installed extension, third-party licenses and quarantine canary; logo alpha. **All NOT VERIFIED until [run 43188038745](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43188038745) completes and logs are reviewed.**

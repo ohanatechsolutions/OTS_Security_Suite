@@ -72,3 +72,7 @@ See [BUILD_BLUEPRINT](docs/BUILD_BLUEPRINT.md), [PROJECT_STATUS](docs/PROJECT_ST
 - UI startup default is 1300×800 DIPs clamped to work area, but human DPI/taskbar verification still required.
 - Go scanner count refers to 95 regex heuristic rules across eight categories plus four built-in detection categories; the count is not a guarantee of malware detection quality.
 - **Status: integration beta, NOT approved for public release.** Existing standalone tools and encrypted quarantine remain preserved.
+
+### Current engineering candidate (verification pending)
+
+Source `a2f39b812e61116ecaa3f4813909b662d4149224` adds true RepoScan cancel propagation; local API origin/connection/resource-limit tests; current-and-legacy encrypted quarantine registry, precise destruction-review authorization; JSON report contract checks; stable Windows taskbar AppUserModelID; PNG transparency pixel check; installed extension and license notices; WPF UI Automation; and patched Go 1.27.4. [Current Windows CI](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43188038745) was **pending** when this README was updated. Do not describe these newest changes as passing until a completed test log supports that claim. No unsigned installer from the draft PR is uploaded or released.

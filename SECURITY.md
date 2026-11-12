@@ -25,3 +25,5 @@ Provide the affected commit or version, impacted component, safe minimal reprodu
 Rebuild with supported patched runtimes and pinned reviewable submodule versions. Keep prior clean installers/verified checksums for rollback. Never erase encrypted vaults, old DPAPI keys or reports during an upgrade/uninstall without a separate reviewed retention decision.
 
 Consult `docs/RELEASE-GATES.md`, `docs/QA_ACCEPTANCE.md`, and `docs/PROJECT_STATUS.md` for the actual security QA and release status. Automated tests are recorded separately from a human penetration/security review.
+
+**Current verification warning (2026-11-11 HST):** newest draft commit `a2f39b812e61` has not yet received a complete Windows CI result; see [queued run 43188038745](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43188038745). The prior green CI applies only to earlier source. Do not distribute current binaries or claim final security verification from the staged source alone.

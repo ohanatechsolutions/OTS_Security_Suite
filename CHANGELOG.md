@@ -21,6 +21,12 @@ All notable changes are recorded against the repository. This is an **unreleased
 - Go Windows scanner build changed to the patched Go 1.27.4 toolchain; GitHub Actions updated to maintained Node 24-compatible major versions.
 - Installer smoke asserts that a synthetic user-vault canary survives uninstall.
 
+- Explicitly require a valid complete/error/checks JSON contract before classifying W.H.I.T.E. clean; reject incomplete or inconsistent reports as a success.
+- Taskbar process and installed shortcuts now share a distinct Windows AppUserModelID; PNG alpha test enforces the supplied white logo's transparent background.
+- Destroy-reviewed authorization binds a selected record's vault path and SHA-256, not only its GUID.
+- TAR decompression hard limit reports resource exhaustion rather than silently treating it as successful EOF.
+- Preserve original MIT/third-party notice text for each bundled original engine.
+
 ### Known limits
 - Static heuristics are not a substitute for traditional endpoint antivirus/EDR.
 - Remote repository scans download a public snapshot; Git history, Git LFS and submodule objects need separate verification.

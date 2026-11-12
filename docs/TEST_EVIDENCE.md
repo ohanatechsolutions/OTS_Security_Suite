@@ -1,6 +1,6 @@
 # OTS Security Suite — Test Evidence (actual results only)
 
-**Updated:** 2026-11-11 21:12 (Pacific/Honolulu)  
+**Updated:** 2026-11-11 (Pacific/Honolulu)  
 **Baseline main commit:** `d45de9592345e0b43acda4226004d72e2a181195`  
 **Active branch:** `work/white-audit-lifecycle-and-blueprint-20261111`  
 **Environment:** Chat Linux session has no Windows/.NET GUI; code was tested on GitHub Actions `windows-latest` runner. See exact source SHA and workflow logs below. GitHub connector has repository write access.
@@ -23,6 +23,24 @@
 | E-009 | REQ-001/002/012/013 | GUI DPI, WebView2, custom protocol/Chrome, privacy/security verification | **NOT RUN** | NOT RUN |
 
 **Important:** Static source change E-003 alone is not verified; newer E-013..E-021 document Windows CI subprocess and installer checks. No interactive GUI acceptance for REQ-006 has been performed. Passing baseline CI E-002 cannot be carried forward as verification of later unbuilt commits. The Go count/heuristic labels, malware classifications, GUI icon, and signature have not been independently validated in this session.
+
+## E-022 through E-030: unverified source additions (do not mark PASS)
+
+The following additions are **code and test cases present in draft PR #2**, source commit `a2f39b812e61116ecaa3f4813909b662d4149224`. GitHub Actions [run 43188038745](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43188038745) was still **queued** when this section was recorded. None of these are falsely promoted to runtime PASS.
+
+| ID | Requirements | What was added | Verification state |
+|---|---|---|---|
+| E-022 | REQ-003/014 | Go `ScanDirContext`, `ScanRemoteContext`, frontend AbortController/Cancel Scan and upload cancellation | Implemented; Go + GUI cancel regression PENDING |
+| E-023 | REQ-002/013 | Auth/session-origin, cross-origin denial, cancellation-no-save and local HTTP timeout Go tests | Test source added; execution PENDING |
+| E-024 | REQ-008 | Dual vault registry and synthetic current/legacy DPAPI/AES quarantine+restore test cases | Test source added; Windows execution PENDING |
+| E-025 | REQ-009 | Review identity incorporates GUID, exact vault path and SHA-256; list refresh invalidates approvals | C# synthetic regression added; execution PENDING |
+| E-026 | REQ-005/015 | WHITE JSON validator checks tool, schema, complete, checks, errors, findings and exit status; cannot mislabel incomplete as clean | C# regression added; execution PENDING |
+| E-027 | REQ-001 | Matching AppUserModelID in WPF process and Inno shortcuts, PNG sampled-alpha CI check | Static source and test exist; build/transparency result PENDING; visual taskbar QA NOT RUN |
+| E-028 | REQ-011/012 | Chrome extension/license/third-party notice installer staging and canary surviving silent uninstall | Windows install checks added; execution PENDING |
+| E-029 | REQ-003/014 | Explicit decompression exhaustion error instead of false TAR end-of-file, including metadata ceiling | Go test added; execution PENDING |
+| E-030 | REQ-005/011 | `tools/windows-ui-smoke.ps1` locates installed WPF, navigates source audit, runs harmless one-file WHITE audit, reads JSON | Automation source added; Windows execution PENDING, independent human GUI QA NOT RUN |
+
+**Previous verified pass remains E-013–E-021** at older source `59243e6b15c6` and [run 43172812782](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43172812782); the later [run 43174959907](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43174959907) passed 10/10 subprocess/report tests for `2d752f765373`. Do not reuse old hashes: the latest candidate's installer SHA-256 is unknown until its CI output is inspected.
 
 ## Latest candidate: verified Windows CI results (supersedes old NOT RUN entries below where scoped)
 
