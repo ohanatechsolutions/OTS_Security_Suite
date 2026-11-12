@@ -166,7 +166,7 @@ public partial class MainWindow : Window
         var buffer = new char[8192];
         while (true)
         {
-            int count = await reader.ReadAsync(buffer.AsMemory(), cancellation);
+            int count = await reader.ReadAsync(buffer.AsMemory(), cancellation).ConfigureAwait(false);
             if (count == 0) return builder.ToString();
             if (count > maxCharacters - builder.Length)
             {
@@ -236,6 +236,11 @@ public partial class MainWindow : Window
                 {
                     if (report.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object)
                         throw new InvalidDataException("Audit output did not contain a JSON report object.");
+                }
+                if (process.ExitCode is not (0 or 1 or 2))
+                {
+                    WhiteStatus.Text = "Audit engine failed (exit " + process.ExitCode + "); no report is exportable.";
+                    return;
                 }
                 _lastWhiteOutput = output;
                 WhiteOutput.Text = output;
