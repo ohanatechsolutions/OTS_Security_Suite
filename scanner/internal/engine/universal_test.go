@@ -153,7 +153,22 @@ func TestSymlinksRecorded(t *testing.T) {
 	}
 }
 func TestRuleCount(t *testing.T) {
-	if RulesCount() < 90 {
-		t.Fatalf("expected expanded rules, got %d", RulesCount())
+	if RulesCount() != 95 {
+		t.Fatalf("advertised 95 regex heuristic rules, got %d", RulesCount())
+	}
+	categories := map[string]bool{}
+	seen := map[string]bool{}
+	for _, rule := range rules {
+		if seen[rule.ID] { t.Fatalf("duplicate detection rule ID: %s", rule.ID) }
+		seen[rule.ID] = true
+		categories[rule.Category] = true
+	}
+	// Four additional built-in detector categories are implemented in engine.go;
+	// they are not part of the 95 regex rules.
+	for _, name := range []string{"File integrity", "Embedded payload", "Document threats", "Test signatures"} {
+		categories[name] = true
+	}
+	if len(categories) != 12 {
+		t.Fatalf("expected 12 categories across regex and built-in detectors, got %d: %v", len(categories), categories)
 	}
 }
