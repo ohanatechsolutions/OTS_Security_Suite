@@ -29,7 +29,7 @@ The native Windows icon and title-bar icon are both set to the user's supplied s
 
 ### Building on Windows
 
-You need .NET 10 SDK, Go 1.23+, Python 3.12, PyInstaller, Inno Setup 6, Microsoft WebView2 runtime, and the two Git submodules (both public).
+You need .NET 10 SDK, Go 1.27.4+ (security-maintained toolchain), Python 3.12, PyInstaller, Inno Setup 6, Microsoft WebView2 runtime, and the two Git submodules (both public).
 
 ```powershell
 git clone --recurse-submodules https://github.com/ohanatechsolutions/OTS_Security_Suite.git

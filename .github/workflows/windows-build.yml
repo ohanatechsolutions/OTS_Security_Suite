@@ -16,26 +16,29 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout suite and pinned dependencies
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: recursive
           persist-credentials: false
       - name: Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
-          go-version: '1.23.x'
+          go-version: '1.27.4'
+          cache: false
       - name: Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
       - name: Validate source and Go scanner
         shell: pwsh
         run: |
           Push-Location scanner
+          go version
+          if ((go version) -notmatch 'go1\.27\.4') { throw 'Scanner toolchain must use patched Go 1.27.4' }
           go test ./...
           if ($LASTEXITCODE -ne 0) { throw 'Go tests failed' }
           go vet ./...

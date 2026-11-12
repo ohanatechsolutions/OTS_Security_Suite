@@ -1,3 +1,3 @@
 module ots/github-malware-scanner
 
-go 1.22
+go 1.27.4
