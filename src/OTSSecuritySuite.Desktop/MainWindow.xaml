@@ -57,7 +57,7 @@
         <Grid Name="SystemPanel" Visibility="Collapsed">
           <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
           <TextBlock Grid.Row="0" Text="WINDOWS THREAT &amp; PERSISTENCE INSPECTION" Foreground="#39FF14" FontWeight="Bold" FontSize="18" Margin="0,0,0,16"/>
-          <WrapPanel Grid.Row="1"><Button Name="QuickButton" Click="RunQuick" Content="QUICK SCAN"/><Button Name="DeepButton" Click="RunDeep" Content="DEEP SCAN"/><Button Click="RunDefender" Content="REQUEST DEFENDER SCAN"/><Button Click="OpenSanitizer" Content="OPEN FULL SANITIZER"/></WrapPanel>
+          <WrapPanel Grid.Row="1"><Button Name="QuickButton" Click="RunQuick" Content="QUICK SCAN"/><Button Name="DeepButton" Click="RunDeep" Content="DEEP SCAN"/><Button Name="SystemCancel" Click="CancelSystemScan" Content="CANCEL SCAN" IsEnabled="False"/><Button Click="RunDefender" Content="REQUEST DEFENDER SCAN"/><Button Click="OpenSanitizer" Content="OPEN FULL SANITIZER"/></WrapPanel>
           <TextBlock Grid.Row="2" Name="SystemStatus" Foreground="#A9CCA9" Text="System inspection is read-only. Destructive actions require confirmation." Margin="0,14,0,12" TextWrapping="Wrap"/>
           <ListView Grid.Row="3" Name="SystemFindings" SelectionMode="Single" >
             <ListView.View><GridView><GridViewColumn Header="Severity" DisplayMemberBinding="{Binding Severity}" Width="90"/><GridViewColumn Header="Finding" DisplayMemberBinding="{Binding Title}" Width="220"/><GridViewColumn Header="Location" DisplayMemberBinding="{Binding Path}" Width="430"/></GridView></ListView.View>
