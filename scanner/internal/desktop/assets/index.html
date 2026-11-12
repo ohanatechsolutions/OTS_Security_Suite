@@ -23,7 +23,7 @@
     </div>
     <div class="feature-strip"><span><b>95</b> DETECTION RULES</span><span><b>12</b> RISK CATEGORIES</span><span><b>0–100</b> RISK SCORE</span><span><b>LOCAL</b> ANALYSIS</span></div>
     </div>
-    <div class="status hidden" id="status"><span class="spinner"></span><span id="statusText">Scanning…</span></div>
+    <div class="status hidden" id="status" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span id="statusText">Scanning…</span><button type="button" class="secondary" id="cancelScan">CANCEL SCAN</button></div>
     <div class="error hidden" id="error"></div>
     <section id="results" class="hidden results-wrap">
       <div class="section-heading"><div><p class="eyebrow">SCAN REPORT // 01</p><h2 id="resultTarget"></h2></div><button class="secondary" id="export">↓ EXPORT JSON</button></div>

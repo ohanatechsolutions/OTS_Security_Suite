@@ -1,6 +1,8 @@
 package desktop
 
 import (
+	"context"
+	"errors"
 	"crypto/rand"
 	"crypto/subtle"
 	"embed"
@@ -83,7 +85,13 @@ func (s *Server) Start() (string, error) {
 	mux.HandleFunc("/api/report/", s.withAuth(s.report))
 	mux.HandleFunc("/api/quit", s.withAuth(s.quit))
 	mux.HandleFunc("/api/window-heartbeat", s.withAuth(s.windowHeartbeat))
-	s.web = &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	s.web = &http.Server{
+		ReadHeaderTimeout: 8 * time.Second,
+		ReadTimeout: 120 * time.Second,
+		WriteTimeout: 180 * time.Second,
+		IdleTimeout: 25 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Host != s.actualAddress {
 			http.Error(w, "invalid host", 403)
 			return
@@ -232,17 +240,21 @@ func (s *Server) scan(w http.ResponseWriter, r *http.Request) {
 	var report *engine.Report
 	var err error
 	if strings.TrimSpace(req.URL) != "" {
-		report, err = engine.ScanRemote(req.URL)
+		report, err = engine.ScanRemoteContext(r.Context(), req.URL)
 	} else if strings.TrimSpace(req.Folder) != "" {
-		report, err = engine.ScanDir(req.Folder)
+		report, err = engine.ScanDirContext(r.Context(), req.Folder)
 	} else {
 		http.Error(w, "specify URL or folder", 400)
 		return
 	}
 	if err != nil {
+		// The originating UI may already have disconnected. Never persist a
+		// partial/cancelled scan as a successful report.
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) { return }
 		http.Error(w, err.Error(), 400)
 		return
 	}
+	if r.Context().Err() != nil { return }
 	s.save(report)
 	writeJSON(w, report)
 }
@@ -265,6 +277,7 @@ func (s *Server) scanUpload(w http.ResponseWriter, r *http.Request) {
 	report := engine.NewReport("Browser-selected local folder", "local folder (browser upload)")
 	count := 0
 	for {
+		if r.Context().Err() != nil { return }
 		part, e := reader.NextPart()
 		if e == io.EOF {
 			break
@@ -293,8 +306,10 @@ func (s *Server) scanUpload(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "folder upload read error", 400)
 			return
 		}
+		if r.Context().Err() != nil { return }
 		engine.ScanBytes(report, name, data)
 	}
+	if r.Context().Err() != nil { return }
 	engine.Finalize(report)
 	s.save(report)
 	writeJSON(w, report)

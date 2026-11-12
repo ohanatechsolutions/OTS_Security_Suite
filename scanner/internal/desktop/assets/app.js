@@ -1,6 +1,6 @@
 'use strict';
 const $=id=>document.getElementById(id);
-let currentReport=null, currentMode='repo';
+let currentReport=null, currentMode='repo', activeScan=null;
 const categories=['Code execution','Data exfiltration','Credential theft','Obfuscation','Supply chain','Persistence','Web vulnerabilities','Host control','Embedded payload','File integrity','Document threats','Test signatures'];
 const escapeHTML=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const show=(id,yes=true)=>$(id).classList.toggle('hidden',!yes);
@@ -13,6 +13,8 @@ async function api(path,options={}){
 document.querySelectorAll('.navitem').forEach(btn=>btn.addEventListener('click',()=>{active('navitem',btn);document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id===btn.dataset.tab));if(btn.dataset.tab==='history')loadHistory();}));
 document.querySelectorAll('.scan-mode').forEach(btn=>btn.addEventListener('click',()=>{active('scan-mode',btn);currentMode=btn.dataset.mode;document.querySelectorAll('.mode').forEach(x=>show(x.id,x.id===currentMode+'-mode'));}));
 async function scan(mode){
+ if(activeScan)return;
+ const controller=new AbortController();activeScan=controller;currentReport=null;$('cancelScan').disabled=false;
  show('error',false);show('status');show('empty',false);show('results',false);$('statusText').textContent='Scanning... A large repository may take a minute.';
  document.querySelectorAll('.primary').forEach(x=>x.disabled=true);
  try{
@@ -20,15 +22,27 @@ async function scan(mode){
   if(mode==='repo'||mode==='folder'){
     let body=mode==='repo'?{url:$('repoUrl').value.trim()}:{folder:$('folderPath').value.trim()};
     if(!Object.values(body)[0])throw new Error('Please enter a repository URL or folder path.');
-    report=await api('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    report=await api('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller.signal});
   }else{
     const files=Array.from((mode==='file'?$('fileUpload'):$('folderUpload')).files);if(!files.length)throw new Error('Choose files or a folder first.');
     const form=new FormData();for(const file of files){form.append('files',file,file.webkitRelativePath||file.name);}
-    report=await api('/api/scan-upload',{method:'POST',body:form});
+    report=await api('/api/scan-upload',{method:'POST',body:form,signal:controller.signal});
   }
   render(report);
- }catch(err){show('error');$('error').textContent=err.message;show('empty',true);}finally{show('status',false);document.querySelectorAll('.primary').forEach(x=>x.disabled=false);}
+ }catch(err){
+  show('error');$('error').textContent=(controller.signal.aborted||err.name==='AbortError')?'Scan cancelled. No completed report was saved.':err.message;
+  show('empty',true);
+ }finally{
+  if(activeScan===controller)activeScan=null;
+  show('status',false);document.querySelectorAll('.primary').forEach(x=>x.disabled=false);
+ }
 }
+$('cancelScan').addEventListener('click',()=>{
+ if(!activeScan)return;
+ $('statusText').textContent='Cancelling scan…';
+ $('cancelScan').disabled=true;
+ activeScan.abort();
+});
 $('scanRepo').onclick=()=>scan('repo');$('scanFolder').onclick=()=>scan('folder');$('scanUpload').onclick=()=>scan('upload');$('scanFiles').onclick=()=>scan('file');
 function render(report){
  currentReport=report;show('results');show('empty',false);

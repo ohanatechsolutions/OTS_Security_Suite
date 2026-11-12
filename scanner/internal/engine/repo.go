@@ -55,11 +55,18 @@ func ParseRepo(input string) (host, owner, repo string, err error) {
 }
 
 func ScanRemote(input string) (*Report, error) {
+	return ScanRemoteContext(context.Background(), input)
+}
+
+// ScanRemoteContext ties remote provider downloads to the authenticated scan
+// request: browser cancellation closes the outbound network request too.
+func ScanRemoteContext(parent context.Context, input string) (*Report, error) {
+	if err := parent.Err(); err != nil { return nil, err }
 	host, owner, repo, err := ParseRepo(input)
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+	ctx, cancel := context.WithTimeout(parent, 100*time.Second)
 	defer cancel()
 	var download string
 	if host == "github.com" {
@@ -98,7 +105,7 @@ func ScanRemote(input string) (*Report, error) {
 		return nil, errors.New("repository snapshot is larger than 60 MB")
 	}
 	report := NewReport("https://"+host+"/"+owner+"/"+repo, "public repository")
-	if err := scanRemoteArchive(res.Body, report); err != nil {
+	if err := scanRemoteArchiveContext(ctx, res.Body, report); err != nil {
 		return nil, err
 	}
 	return report, nil
@@ -107,6 +114,11 @@ func ScanRemote(input string) (*Report, error) {
 // scanRemoteArchive is isolated so resource-safety limits can be verified using
 // synthetic tarballs without contacting public repository providers.
 func scanRemoteArchive(body io.Reader, report *Report) error {
+	return scanRemoteArchiveContext(context.Background(), body, report)
+}
+
+func scanRemoteArchiveContext(ctx context.Context, body io.Reader, report *Report) error {
+	if err := ctx.Err(); err != nil { return err }
 	compressed := io.LimitReader(body, MaxArchiveBytes+1)
 	gz, err := gzip.NewReader(compressed)
 	if err != nil {
@@ -117,6 +129,7 @@ func scanRemoteArchive(body io.Reader, report *Report) error {
 	entries := 0
 	var unpackedBytes int64
 	for {
+		if err := ctx.Err(); err != nil { return err }
 		hdr, e := tr.Next()
 		if e == io.EOF {
 			break
@@ -163,8 +176,10 @@ func scanRemoteArchive(body io.Reader, report *Report) error {
 			report.Uninspected(name, "could not read repository file", false, hdr.Size)
 			continue
 		}
+		if err := ctx.Err(); err != nil { return err }
 		ScanFile(report, name, data, hdr.Size, false, 0)
 	}
+	if err := ctx.Err(); err != nil { return err }
 	report.warn("A source archive represents one revision; it excludes Git history, linked submodules and Git LFS payloads unless included.")
 	Finalize(report)
 	return nil

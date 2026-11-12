@@ -2,6 +2,7 @@ package engine
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -340,6 +341,13 @@ func Finalize(report *Report) {
 	sort.SliceStable(report.Findings, func(i, j int) bool { return report.Findings[i].Weight > report.Findings[j].Weight })
 }
 func ScanDir(root string) (*Report, error) {
+	return ScanDirContext(context.Background(), root)
+}
+
+// ScanDirContext stops inventorying and inspecting files when the browser's
+// local HTTP request is cancelled. A cancelled scan is never saved as complete.
+func ScanDirContext(ctx context.Context, root string) (*Report, error) {
+	if err := ctx.Err(); err != nil { return nil, err }
 	root, err := filepath.Abs(root)
 	if err != nil {
 		return nil, err
@@ -362,12 +370,14 @@ func ScanDir(root string) (*Report, error) {
 		if e != nil {
 			return nil, e
 		}
+		if err := ctx.Err(); err != nil { return nil, err }
 		ScanFile(report, filepath.Base(root), data, info.Size(), false, 0)
 		Finalize(report)
 		return report, nil
 	}
 	report := NewReport(root, "local folder")
 	err = filepath.WalkDir(root, func(path string, d os.DirEntry, walkerr error) error {
+		if err := ctx.Err(); err != nil { return err }
 		if walkerr != nil {
 			report.warn("Folder traversal error: " + walkerr.Error())
 			report.Truncated = true
@@ -410,12 +420,14 @@ func ScanDir(root string) (*Report, error) {
 			report.Uninspected(rel, "file read failed", false, info.Size())
 			return nil
 		}
+		if err := ctx.Err(); err != nil { return err }
 		ScanFile(report, rel, data, info.Size(), false, 0)
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
+	if err := ctx.Err(); err != nil { return nil, err }
 	Finalize(report)
 	return report, nil
 }
