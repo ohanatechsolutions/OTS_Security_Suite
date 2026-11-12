@@ -48,12 +48,12 @@
 
 ## Change set and exact continuation
 
-- `src/OTSSecuritySuite.Desktop/MainWindow.xaml.cs`: link W.H.I.T.E. cancel to timeout and suite close; process-tree kill attempt; clear stale export, maintain single audit.
+- `src/OTSSecuritySuite.Desktop/MainWindow.xaml.cs`: link W.H.I.T.E. cancel to timeout and suite close; process-tree kill attempt; clear stale export, maintain single audit; cap output and reject invalid JSON.
 - `src/OTSSecuritySuite.Desktop/MainWindow.xaml`: wired **CANCEL AUDIT** button with initially disabled state.
 - `docs/BUILD_BLUEPRINT.md`: scope, acceptance, architecture, threats and roadmap.
 - `docs/PROJECT_STATUS.md`, `docs/TEST_EVIDENCE.md`: truth ledger; `docs/RELEASE-GATES.md`: NO-GO controls.
 
-**Next exact action:** On Windows with .NET 10/WPF, build the feature branch and execute TEST-006/017 (normal, cancel, timeout, suite-close, startup-denied), then log process PIDs and exit results; fix any abnormal child lifetime. Independently inspect and bound W.H.I.T.E. stdout and ensure stderr cannot reveal private data. **Do not merge on unexecuted integration tests.**
+**Next exact action:** On Windows with .NET 10/WPF, build the feature branch and execute TEST-006/017 (normal, cancel, timeout, suite-close, startup-denied), then log process PIDs and exit results; fix any abnormal child lifetime. Validate the newly added 16 Mi-character stdout/128 Ki-character stderr caps and JSON-only export; verify child termination and absence of sensitive stderr through actual Windows tests. **Do not merge on unexecuted integration tests.**
 
 ## Approval matrix and N/A
 - Safe review-branch source edits and read-only inspection: allowed by user's BUILD request.
@@ -69,7 +69,7 @@
 | R-002 | OPEN | Partial or truncated scan falsely appears clean | Engineering; report semantics + corpus tests |
 | R-003 | OPEN | Child subprocess may remain after timeout/close | Engineering; new kill path; Windows process-tree tests |
 | R-004 | OPEN | Localhost authentication/session and URL attack surface | Security; loopback/origin/CSRF/port abuse tests |
-| R-005 | OPEN | Secrets via audit stderr or oversized stdout | Security; redaction/output bounds |
+| R-005 | IN PROGRESS | Secrets via audit stderr or oversized stdout | Code caps and no-raw-stderr display added; Windows privacy/overflow tests pending |
 | R-006 | OPEN | Installer unsigned, reputation warnings and release authenticity | Owner; signing decision and verified hash |
 | R-007 | OPEN | Third-party module/submodule supply-chain or license drift | Maintainer; pin and inventory |
 | D-001 | PROVISIONAL | Retain existing WPF/Go/Python/.NET architecture, do not rewrite to Python without a demonstrated reason | Engineering; reviewed with owner |
