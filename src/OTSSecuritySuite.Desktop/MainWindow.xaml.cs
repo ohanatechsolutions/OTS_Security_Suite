@@ -82,6 +82,14 @@ public partial class MainWindow : Window
             RepositoryBrowser.CoreWebView2.Settings.AreDevToolsEnabled = false;
             RepositoryBrowser.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
             RepositoryBrowser.CoreWebView2.Settings.IsWebMessageEnabled = false;
+            // Only the embedded local scanner is permitted to interact with the suite.
+            // Block new browser windows, external pop-ups, and web permission prompts.
+            RepositoryBrowser.CoreWebView2.NewWindowRequested += (_, popup) => {
+                popup.Handled = true;
+            };
+            RepositoryBrowser.CoreWebView2.PermissionRequested += (_, permission) => {
+                permission.State = CoreWebView2PermissionState.Deny;
+            };
             RepositoryBrowser.CoreWebView2.NavigationStarting += (_, nav) => {
                 if (!Uri.TryCreate(nav.Uri, UriKind.Absolute, out var dest) ||
                     dest.Scheme != "http" || dest.Host != "127.0.0.1" || dest.Port != address.Port)
