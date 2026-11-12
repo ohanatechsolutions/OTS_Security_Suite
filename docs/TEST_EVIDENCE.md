@@ -24,23 +24,25 @@
 
 **Important:** Static source change E-003 alone is not verified; newer E-013..E-021 document Windows CI subprocess and installer checks. No interactive GUI acceptance for REQ-006 has been performed. Passing baseline CI E-002 cannot be carried forward as verification of later unbuilt commits. The Go count/heuristic labels, malware classifications, GUI icon, and signature have not been independently validated in this session.
 
-## E-022 through E-030: unverified source additions (do not mark PASS)
+## E-022 through E-030: verified automated checks, with separate manual gaps
 
-The following additions are **code and test cases present in draft PR #2**, source commit `a2f39b812e61116ecaa3f4813909b662d4149224`. GitHub Actions [run 43188038745](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43188038745) was still **queued** when this section was recorded. None of these are falsely promoted to runtime PASS.
+**Current actual Windows CI evidence:** [run 43189027296](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43189027296) **SUCCESS** for docs head `de277e5fa3bb2d7e1bd8b2aac362a3d9e74ff916` containing executable source `a2f39b812e61116ecaa3f4813909b662d4149224`, with `Audit runner tests: 15/15 PASS`, packaged WHITE success/incomplete contract, 95 scanner rules and Go tests/vet, WPF synthetic navigation and real CLI execution, logo PNG sampled transparency (1563×1563), Inno installer, bundled MIT/license notices, extension files, synthetic vault preservation, URI registration, normal close and uninstall. Installer SHA-256 `8872BB5E2039C7B5F6AA13EA7AC52276CB22C80AA88B00FCDEE6271B5BC1C929` (CI-created, deliberately not uploaded on draft PR). **Automated gates passed; human Win10/Win11, clean Chrome extension, legacy real-user vault, independent security and publisher signing remain NOT RUN / blocked.**
+
+The individual rows distinguish source/CI PASS from manual acceptance that remains NOT RUN. Relevant job ID: `131083365201`. The log includes 15/15 audit/report/vault regression cases, real WHITE WPF UI automation, 95 rules, logo transparency, license files, and synthetic quarantine preservation. The signed-release gate remains NO-GO.
 
 | ID | Requirements | What was added | Verification state |
 |---|---|---|---|
-| E-022 | REQ-003/014 | Go `ScanDirContext`, `ScanRemoteContext`, frontend AbortController/Cancel Scan and upload cancellation | Implemented; Go + GUI cancel regression PENDING |
-| E-023 | REQ-002/013 | Auth/session-origin, cross-origin denial, cancellation-no-save and local HTTP timeout Go tests | Test source added; execution PENDING |
-| E-024 | REQ-008 | Dual vault registry and synthetic current/legacy DPAPI/AES quarantine+restore test cases | Test source added; Windows execution PENDING |
-| E-025 | REQ-009 | Review identity incorporates GUID, exact vault path and SHA-256; list refresh invalidates approvals | C# synthetic regression added; execution PENDING |
-| E-026 | REQ-005/015 | WHITE JSON validator checks tool, schema, complete, checks, errors, findings and exit status; cannot mislabel incomplete as clean | C# regression added; execution PENDING |
-| E-027 | REQ-001 | Matching AppUserModelID in WPF process and Inno shortcuts, PNG sampled-alpha CI check | Static source and test exist; build/transparency result PENDING; visual taskbar QA NOT RUN |
-| E-028 | REQ-011/012 | Chrome extension/license/third-party notice installer staging and canary surviving silent uninstall | Windows install checks added; execution PENDING |
-| E-029 | REQ-003/014 | Explicit decompression exhaustion error instead of false TAR end-of-file, including metadata ceiling | Go test added; execution PENDING |
-| E-030 | REQ-005/011 | `tools/windows-ui-smoke.ps1` locates installed WPF, navigates source audit, runs harmless one-file WHITE audit, reads JSON | Automation source added; Windows execution PENDING, independent human GUI QA NOT RUN |
+| E-022 | REQ-003/014 | Go ScanDirContext/ScanRemoteContext cancellation unit tests, new AbortController Cancel Scan code | **PASS Go test/vet**; manual frontend Cancel click NOT RUN |
+| E-023 | REQ-002/013 | Auth/session-origin and cross-origin denial, cancelled scan not persisted, HTTP server limits | **PASS Go CI tests**; independent penetration check NOT RUN |
+| E-024 | REQ-008 | Both historical and current encrypted DPAPI/AES vault registry + round-trip synthetic restore | **PASS 15/15 C# smoke suite**; real historical Windows profile NOT RUN |
+| E-025 | REQ-009 | Destruction review token unique to exact vault path + immutable SHA256 | **PASS C# synthetic smoke case**; real destructive denial QA NOT RUN |
+| E-026 | REQ-005/015 | Validate WHITE JSON schema, complete flag, pending checks, errors and exit status | **PASS C# regression cases**; output corruption fail-closed verified synthetically |
+| E-027 | REQ-001 | Stable AppUserModelID static assertion, PNG pixel alpha sample (1563×1563), WPF install/start | **PASS Windows CI**; taskbar pin appearance/DPI user test NOT RUN |
+| E-028 | REQ-011/012 | Bundled Chrome extension, original MIT/third-party notice files; synthetic vault canary retained after uninstall | **PASS installed Windows smoke**; Chrome clean-profile activation NOT RUN |
+| E-029 | REQ-003/014 | Decompression budget explicitly ErrCoverage instead of silent TAR EOF; remote synthetic fixture | **PASS Go tests/vet**; broad fuzz corpus NOT RUN |
+| E-030 | REQ-005/011 | Installed WPF UI Automation opened Code Audit, typed safe fixture path, ran packaged WHITE, validated JSON, navigated Security | **PASS Windows CI automation**; independent interactive human workflow NOT RUN |
 
-**Previous verified pass remains E-013–E-021** at older source `59243e6b15c6` and [run 43172812782](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43172812782); the later [run 43174959907](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43174959907) passed 10/10 subprocess/report tests for `2d752f765373`. Do not reuse old hashes: the latest candidate's installer SHA-256 is unknown until its CI output is inspected.
+**Current verified CI log:** [43189027296](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43189027296), head `de277e5fa3bb2d7e1bd8b2aac362a3d9e74ff916`, C# `15/15 PASS`, SHA-256 `8872BB5E2039C7B5F6AA13EA7AC52276CB22C80AA88B00FCDEE6271B5BC1C929`. The PR deliberately SKIPPED upload/public distribution. **Previous verified pass remains E-013–E-021** at older source `59243e6b15c6` and [run 43172812782](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43172812782); the later [run 43174959907](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43174959907) passed 10/10 subprocess/report tests for `2d752f765373`. The current candidate hash above supersedes all previous CI installer hashes; no public artifact is available from this draft PR.
 
 ## Latest candidate: verified Windows CI results (supersedes old NOT RUN entries below where scoped)
 

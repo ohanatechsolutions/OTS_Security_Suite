@@ -1,13 +1,13 @@
 # OTS Security Suite — public release gates
 
-Current status: **INTEGRATION PREVIEW — OLDER CI VERIFIED; LATEST BRANCH CI PENDING; PUBLIC RELEASE NO-GO**.
+Current status: **INTEGRATION PREVIEW — LATEST WINDOWS CI PASS; INDEPENDENT QA AND SIGNED PUBLIC RELEASE NO-GO**.
 
 **2026-11-11 (HST) governance:** Baseline main `d45de9592345` has successful GitHub Windows CI [run #7](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43132451936). This is **not** evidence that the M1 feature branch is buildable or user-installable. Current source/requirements, actual checks, and open decisions are recorded in [BUILD_BLUEPRINT](BUILD_BLUEPRINT.md), [PROJECT_STATUS](PROJECT_STATUS.md), and [TEST_EVIDENCE](TEST_EVIDENCE.md).
 
 **Current candidate evidence:** [Windows CI run 43172812782](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43172812782) PASS at `59243e6b15c6` with 8/8 audit-process tests, real WPF launch/close, bundled scanner/WHITE/Sanitizer checks, Inno EXE PE header, SHA-256, protocol registration and uninstall. Installer was not uploaded on the PR. See [TEST_EVIDENCE](TEST_EVIDENCE.md) E-013–E-021.  
 **CI installer hash:** `389DBCFE20AE5CB29EAA4F17B5360DEF0DD14841FA4DE7F767301289AFABF092`.
 
-**Latest source** `a2f39b812e61116ecaa3f4813909b662d4149224` adds RepoScan cancellation, legacy dual-vault review, W.H.I.T.E. JSON integrity, app identity/logo alpha, installer license/extension data preservation and more tests. [Run 43188038745](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43188038745) **QUEUED**, not a PASS at this writing. No signed artifact or real Windows 10/11 QA. Record a distinct PASS/FAIL and installer SHA only from this exact latest source after the workflow completes.
+**Current actual Windows CI evidence:** [run 43189027296](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43189027296) **SUCCESS** for docs head `de277e5fa3bb2d7e1bd8b2aac362a3d9e74ff916` containing executable source `a2f39b812e61116ecaa3f4813909b662d4149224`, with `Audit runner tests: 15/15 PASS`, packaged WHITE success/incomplete contract, 95 scanner rules and Go tests/vet, WPF synthetic navigation and real CLI execution, logo PNG sampled transparency (1563×1563), Inno installer, bundled MIT/license notices, extension files, synthetic vault preservation, URI registration, normal close and uninstall. Installer SHA-256 `8872BB5E2039C7B5F6AA13EA7AC52276CB22C80AA88B00FCDEE6271B5BC1C929` (CI-created, deliberately not uploaded on draft PR). **Automated gates passed; human Win10/Win11, clean Chrome extension, legacy real-user vault, independent security and publisher signing remain NOT RUN / blocked.**
 
 **Formal release decision: NO-GO.** No owner/publication approval, verified Windows end-to-end integration acceptance, or independently verified publisher signature. Preserve original apps and quarantine; never publish an unsigned beta as a signed public release.
 
@@ -52,10 +52,12 @@ Never turn an incomplete scan into a clean malware verdict. Neither heuristics n
 **N/A with rationale:** payments/subscriptions, mobile app stores, SaaS production deployment, AI agent/LLM behavior and firmware: no such product components in Windows V1. The Windows desktop, browser-extension, local-first and security utility addenda remain applicable.
 
 ## V1 release-evidence deltas still required
-- [ ] Latest Go 1.27.4 build, scanner cancel/HTTP negative tests, TAR resource boundary PASS on one immutable commit.
-- [ ] Latest W.H.I.T.E. JSON completion assessment and all **15** headless Windows audit/vault smoke cases PASS.
-- [ ] Actual installed WPF synthetic UI navigation and audit automation PASS (or document why runner lacks UI).
-- [ ] Logo PNG sampled alpha and installed icon/AUMID identity checks PASS; human 100/150/200% DPI/taskbar check separate.
-- [ ] Current and legacy encrypted vault synthetic roundtrip and user-data preservation during uninstall PASS; real historical DPAPI profile QA separate.
-- [ ] Pinned dependency MIT notices, scanner notice, Chrome manifest installed; inspect original redistribution rights for suite's own source/license choice.
+- [x] Go 1.27.4 builder and scanner cancel/HTTP negative/TAR resource unit/vet tests PASS, [run 43189027296](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43189027296); manual UI Cancel still required.
+- [x] WHITE JSON fail-closed assessment and **15/15** headless Windows runner/report/dual-vault review tests PASS (same run).
+- [x] Installed WPF synthetic UI navigation + packaged WHITE CLI end-to-end automation PASS (same run).
+- [x] PNG logo sampled alpha (1563×1563), WPF source AppUserModelID and native EXE icon/installed shortcut setup checks PASS; human 100/150/200% DPI/taskbar check separate remains OPEN.
+- [x] Dual-vault synthetic DPAPI/AES roundtrip and synthetic vault canary retention during uninstall PASS; real historical profile and recovery QA OPEN.
+- [x] Installed extension and pinned MIT/license/notice files presence PASS; suite source/license distribution decision still OPEN.
 - [ ] Obtain authorized publisher certificate/signing process; do not infer legitimacy from Installed Apps publisher metadata.
+
+**Latest CI-generated installer hash, NOT PUBLISHED:** `8872BB5E2039C7B5F6AA13EA7AC52276CB22C80AA88B00FCDEE6271B5BC1C929`, source `a2f39b812e61116ecaa3f4813909b662d4149224`, Windows run [43189027296](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43189027296). The previous CI-generated hash belongs to an older build and must not be used for this candidate.

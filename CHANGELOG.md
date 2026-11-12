@@ -27,6 +27,10 @@ All notable changes are recorded against the repository. This is an **unreleased
 - TAR decompression hard limit reports resource exhaustion rather than silently treating it as successful EOF.
 - Preserve original MIT/third-party notice text for each bundled original engine.
 
+### Verification (not a release)
+
+Windows CI [run 43189027296](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43189027296) **PASS** at source `a2f39b812e61116ecaa3f4813909b662d4149224` / documentation head `de277e5fa3bb2d7e1bd8b2aac362a3d9e74ff916`: Go tests/vet, 15/15 WPF audit/report/vault regressions, synthetic native UI audit, PNG transparency, MIT notice packaging and user-vault-preserving uninstall. Installer SHA-256 `8872BB5E2039C7B5F6AA13EA7AC52276CB22C80AA88B00FCDEE6271B5BC1C929`. The PR artifact upload was intentionally skipped and no publisher-signed release exists.
+
 ### Known limits
 - Static heuristics are not a substitute for traditional endpoint antivirus/EDR.
 - Remote repository scans download a public snapshot; Git history, Git LFS and submodule objects need separate verification.
