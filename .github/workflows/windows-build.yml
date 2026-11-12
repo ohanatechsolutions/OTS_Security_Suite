@@ -66,6 +66,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Sanitizer smoke tests failed' }
           dotnet publish modules/OTS_System_Sanitizer/src/OTSSystemSanitizer.Desktop/OTSSystemSanitizer.Desktop.csproj -c Release -r win-x64 --self-contained true -o bundle/engines
           if ($LASTEXITCODE -ne 0) { throw 'Sanitizer build failed' }
+      - name: W.H.I.T.E. process cancellation and privacy regression tests
+        shell: pwsh
+        run: |
+          dotnet run --project tests/OTSSecuritySuite.AuditSmoke/OTSSecuritySuite.AuditSmoke.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'W.H.I.T.E. process security smoke failed' }
       - name: Build native WPF suite host
         shell: pwsh
         run: |
