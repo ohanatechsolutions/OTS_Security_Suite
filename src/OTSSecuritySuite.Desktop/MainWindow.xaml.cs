@@ -208,18 +208,16 @@ public partial class MainWindow : Window
                 WhiteStatus.Text = "Audit returned no JSON report. Check the audit configuration and retry.";
                 return;
             }
-            using (var document = System.Text.Json.JsonDocument.Parse(execution.StandardOutput))
-            {
-                if (document.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object)
-                    throw new InvalidDataException("Audit output did not contain a JSON report object.");
-            }
+            var assessment = WhiteAuditReportValidator.Assess(execution.StandardOutput, execution.ExitCode);
             _lastWhiteOutput = execution.StandardOutput;
             WhiteOutput.Text = execution.StandardOutput;
-            WhiteStatus.Text = execution.ExitCode switch {
-                0 => "Audit completed · no findings at the configured failure threshold",
-                1 => "Audit completed · findings require review",
-                _ => "Audit incomplete · review the report and configuration"
-            };
+            WhiteStatus.Text = !assessment.Complete
+                ? "Audit incomplete · review failed checks/errors before trusting any findings"
+                : execution.ExitCode == 1
+                    ? $"Audit completed · {assessment.FindingCount} findings require review"
+                    : assessment.FindingCount > 0
+                        ? $"Audit completed · {assessment.FindingCount} findings below the configured failure threshold"
+                        : "Audit completed · no findings from the enabled checks";
         }
         catch (TimeoutException) { if (!_isClosing) WhiteStatus.Text = "Audit timed out after 12 minutes; termination requested."; }
         catch (OperationCanceledException) { if (!_isClosing) WhiteStatus.Text = "Audit cancelled; termination requested."; }

@@ -8,6 +8,48 @@ namespace OTSSecuritySuite.Desktop;
 /// Commits an approved local W.H.I.T.E. JSON report without truncating an existing
 /// destination when validation or writing fails. Caller owns file picker/overwrite consent.
 /// </summary>
+public sealed record WhiteReportAssessment(bool Complete, int FindingCount);
+
+public static class WhiteAuditReportValidator
+{
+    /// <summary>
+    /// Never infer clean/complete status solely from a child-process exit code.
+    /// An inconsistent schema or mismatched report is rejected before UI export.
+    /// </summary>
+    public static WhiteReportAssessment Assess(string json, int exitCode)
+    {
+        if (exitCode is not (0 or 1 or 2))
+            throw new InvalidDataException("Audit process returned an unrecognized status.");
+        ArgumentException.ThrowIfNullOrWhiteSpace(json);
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        if (root.ValueKind != JsonValueKind.Object ||
+            !root.TryGetProperty("tool", out var tool) ||
+            tool.ValueKind != JsonValueKind.String || tool.GetString() != "OTS W.H.I.T.E." ||
+            !root.TryGetProperty("schema_version", out var version) ||
+            version.ValueKind != JsonValueKind.String || version.GetString() != "1.0" ||
+            !root.TryGetProperty("complete", out var complete) ||
+            complete.ValueKind is not (JsonValueKind.True or JsonValueKind.False) ||
+            !root.TryGetProperty("checks", out var checks) || checks.ValueKind != JsonValueKind.Object ||
+            !root.TryGetProperty("errors", out var errors) || errors.ValueKind != JsonValueKind.Array ||
+            !root.TryGetProperty("findings", out var findings) || findings.ValueKind != JsonValueKind.Array)
+            throw new InvalidDataException("Audit output does not match the supported W.H.I.T.E. JSON schema.");
+
+        bool checksComplete = true;
+        foreach (var check in checks.EnumerateObject())
+        {
+            if (check.Value.ValueKind != JsonValueKind.String ||
+                check.Value.GetString() is not ("completed" or "skipped"))
+                checksComplete = false;
+        }
+        // A report with source-level failures, incomplete checks, or exit=2
+        // remains incomplete even when a child erroneously declares complete.
+        bool isComplete = complete.GetBoolean() && checksComplete &&
+                          errors.GetArrayLength() == 0 && exitCode != 2;
+        return new WhiteReportAssessment(isComplete, findings.GetArrayLength());
+    }
+}
+
 public static class WhiteReportWriter
 {
     public static void Save(string selectedPath, string jsonReport)

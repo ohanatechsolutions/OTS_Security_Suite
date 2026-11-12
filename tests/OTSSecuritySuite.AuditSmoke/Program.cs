@@ -16,6 +16,8 @@ var cases = new (string Name, Func<Task> Action)[]
     ("report export rejects absent directory and cleans temp output", ExportFailureCleanly),
     ("quarantine registry preserves current and legacy vaults", BothQuarantineVaults),
     ("quarantine registry does not create a legacy vault", DoesNotCreateLegacyVault),
+    ("WHITE JSON contract cannot report inconsistent results as clean", WhiteReportConsistency),
+    ("WHITE JSON contract rejects mismatched or incomplete schemas", WhiteReportSchema),
 };
 int passed = 0;
 foreach (var (name, action) in cases)
@@ -231,6 +233,37 @@ static Task DoesNotCreateLegacyVault()
         Assert(vaults.List().Count == 0, "Empty vault reports unexpected records");
     }
     finally { if (Directory.Exists(baseDir)) Directory.Delete(baseDir, recursive: true); }
+    return Task.CompletedTask;
+}
+
+static Task WhiteReportConsistency()
+{
+    const string good = """{"tool":"OTS W.H.I.T.E.","schema_version":"1.0","complete":true,"checks":{"secrets":"completed","sca":"skipped"},"errors":[],"findings":[{"rule_id":"TEST"}]}""";
+    var valid = WhiteAuditReportValidator.Assess(good, 0);
+    Assert(valid.Complete && valid.FindingCount == 1, "Valid contract must retain below-threshold findings");
+    Assert(!WhiteAuditReportValidator.Assess(good, 2).Complete, "Incomplete exit code must never be labeled clean");
+    var falseComplete = good.Replace("\"complete\":true", "\"complete\":false");
+    Assert(!WhiteAuditReportValidator.Assess(falseComplete, 0).Complete, "Declared incomplete audit labeled clean");
+    var failures = good.Replace("\"errors\":[]", "\"errors\":[\"missing local cache\"]");
+    Assert(!WhiteAuditReportValidator.Assess(failures, 0).Complete, "Audit errors were ignored");
+    var pending = good.Replace("\"secrets\":\"completed\"", "\"secrets\":\"pending\"");
+    Assert(!WhiteAuditReportValidator.Assess(pending, 0).Complete, "Pending audit check labeled clean");
+    return Task.CompletedTask;
+}
+
+static Task WhiteReportSchema()
+{
+    foreach (var malformed in new[] {
+        "{}", "[]", """{"tool":"other","schema_version":"1.0","complete":true,"checks":{},"errors":[],"findings":[]}""",
+        """{"tool":"OTS W.H.I.T.E.","schema_version":"1.0","checks":{},"errors":[],"findings":[]}"""
+    }) {
+        try
+        {
+            WhiteAuditReportValidator.Assess(malformed, 0);
+            throw new Exception("Unexpected audit schema accepted");
+        }
+        catch (InvalidDataException) { }
+    }
     return Task.CompletedTask;
 }
 
