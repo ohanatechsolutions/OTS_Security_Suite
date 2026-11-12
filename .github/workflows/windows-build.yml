@@ -107,6 +107,8 @@ jobs:
         run: |
           dotnet publish src/OTSSecuritySuite.Desktop/OTSSecuritySuite.Desktop.csproj -c Release -r win-x64 --self-contained true -o bundle
           if ($LASTEXITCODE -ne 0) { throw 'Suite host build failed' }
+          Copy-Item -Path extension -Destination bundle/extension -Recurse -Force
+          if ($LASTEXITCODE -ne 0) { throw 'Suite host build failed' }
           foreach ($path in @('bundle/OTSSecuritySuite.exe','bundle/engines/OTSWhiteAudit.exe','bundle/engines/OTSScannerEngine.exe','bundle/engines/OTSSystemSanitizer.exe')) {
             if (-not (Test-Path $path)) { throw "Missing output $path" }
           }
@@ -151,6 +153,12 @@ jobs:
           finally {
             if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
           }
+          # Synthetic preservation canary verifies that uninstall never destroys
+          # a user's existing per-profile encrypted quarantine data.
+          $vaultRoot = Join-Path $env:LOCALAPPDATA 'OTSSystemSanitizer\Quarantine'
+          New-Item -ItemType Directory -Force -Path $vaultRoot | Out-Null
+          $vaultCanary = Join-Path $vaultRoot ("ots-ci-preserve-" + [Guid]::NewGuid().ToString('N') + '.txt')
+          [System.IO.File]::WriteAllText($vaultCanary, 'synthetic-quarantine-preservation-check')
           $installer = (Resolve-Path 'artifacts/OTS-Security-Suite-Setup-x64.exe').Path
           $stream = [System.IO.File]::OpenRead($installer)
           try {
@@ -162,7 +170,7 @@ jobs:
           $setup = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-') -Wait -PassThru
           if ($setup.ExitCode -ne 0) { throw "Silent setup failed: exit $($setup.ExitCode)" }
           $installPath = Join-Path $env:LOCALAPPDATA 'Programs/Ohana Tech Solutions/Security Suite'
-          foreach ($required in @('OTSSecuritySuite.exe','engines/OTSScannerEngine.exe','engines/OTSWhiteAudit.exe','engines/OTSSystemSanitizer.exe')) {
+          foreach ($required in @('OTSSecuritySuite.exe','engines/OTSScannerEngine.exe','engines/OTSWhiteAudit.exe','engines/OTSSystemSanitizer.exe','extension/manifest.json','extension/popup.js')) {
             if (-not (Test-Path (Join-Path $installPath $required))) { throw "Installer missing $required" }
           }
           Add-Type -AssemblyName System.Drawing
@@ -210,6 +218,12 @@ jobs:
           if ($remove.ExitCode -ne 0) { throw "Silent uninstall failed: exit $($remove.ExitCode)" }
           if (Test-Path 'HKCU:\Software\Classes\ots-security') { throw 'Uninstall left custom protocol registration behind' }
           if (Test-Path $desktopExe) { throw 'Uninstall left main EXE behind' }
+          if ((-not (Test-Path $vaultCanary)) -or
+              ([System.IO.File]::ReadAllText($vaultCanary) -ne 'synthetic-quarantine-preservation-check')) {
+            throw 'Install/uninstall unexpectedly damaged existing user quarantine data'
+          }
+          Remove-Item -LiteralPath $vaultCanary -Force
+          Write-Host 'Synthetic user-vault preservation through install/uninstall verified'
           Write-Host 'Installer, bundled modules, icon, URI registration and uninstaller smoke checks passed'
       - name: Upload Windows installer (unsigned test build)
         if: github.event_name != 'pull_request'
