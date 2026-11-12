@@ -46,7 +46,24 @@ public partial class MainWindow : Window
 
     private async void OnWindowLoaded(object sender, RoutedEventArgs e)
     {
+        FitInitialWindowToWorkArea();
         await StartRepositoryEngineAsync();
+    }
+
+    private void FitInitialWindowToWorkArea()
+    {
+        // WorkArea and WPF Window bounds are both in device-independent pixels.
+        // Keep the requested 1300x800 default when space allows, but never force
+        // a window larger than the available desktop on scaled/small displays.
+        var work = SystemParameters.WorkArea;
+        var availableWidth = Math.Max(1, work.Width - 24);
+        var availableHeight = Math.Max(1, work.Height - 24);
+        MinWidth = Math.Min(900, availableWidth);
+        MinHeight = Math.Min(650, availableHeight);
+        Width = Math.Min(1300, availableWidth);
+        Height = Math.Min(800, availableHeight);
+        Left = work.Left + (work.Width - Width) / 2;
+        Top = work.Top + (work.Height - Height) / 2;
     }
 
     private async Task StartRepositoryEngineAsync()
