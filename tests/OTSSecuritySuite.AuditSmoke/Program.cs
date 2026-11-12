@@ -14,6 +14,8 @@ var cases = new (string Name, Func<Task> Action)[]
     ("invalid shell and nonredirected process rejected", RejectUnsafeConfiguration),
     ("report export is atomic and preserves old JSON on invalid input", AtomicJsonExport),
     ("report export rejects absent directory and cleans temp output", ExportFailureCleanly),
+    ("quarantine registry preserves current and legacy vaults", BothQuarantineVaults),
+    ("quarantine registry does not create a legacy vault", DoesNotCreateLegacyVault),
 };
 int passed = 0;
 foreach (var (name, action) in cases)
@@ -178,6 +180,57 @@ static Task ExportFailureCleanly()
         Assert(Directory.GetFiles(root).Length == 1, "Failed export leaked temporary output");
     }
     finally { Directory.Delete(root, recursive: true); }
+    return Task.CompletedTask;
+}
+
+static Task BothQuarantineVaults()
+{
+    var baseDir = Path.Combine(Path.GetTempPath(), "ots-vault-registry-" + Guid.NewGuid().ToString("N"));
+    var current = Path.Combine(baseDir, "current");
+    var legacy = Path.Combine(baseDir, "legacy");
+    Directory.CreateDirectory(baseDir);
+    Directory.CreateDirectory(legacy);
+    try
+    {
+        var oldFile = Path.Combine(baseDir, "legacy-fixture.pdf.exe");
+        var newFile = Path.Combine(baseDir, "current-fixture.pdf.exe");
+        File.WriteAllText(oldFile, "SYNTHETIC LEGACY DATA");
+        File.WriteAllText(newFile, "SYNTHETIC CURRENT DATA");
+        var oldService = new OTSSystemSanitizer.Core.QuarantineService(legacy);
+        var oldRecord = oldService.Quarantine(oldFile);
+        var vaults = new QuarantineVaultRegistry(current, legacy);
+        var currentRecord = vaults.Quarantine(newFile);
+        Assert(File.Exists(oldRecord.VaultFile) && File.Exists(currentRecord.VaultFile),
+            "Creating a new vault corrupted a previous encrypted vault");
+        Assert(vaults.List().Count == 2, "Did not show both current and historical quarantine records");
+        Assert(currentRecord.VaultFile.StartsWith(current, StringComparison.OrdinalIgnoreCase),
+            "New quarantine must be kept in the current OTS folder");
+        vaults.Restore(oldRecord);
+        Assert(File.ReadAllText(oldFile) == "SYNTHETIC LEGACY DATA",
+            "Legacy DPAPI/AES vault did not round-trip through the unified UI registry");
+        Assert(File.Exists(currentRecord.VaultFile), "Restoring legacy record affected current vault");
+        vaults.Restore(currentRecord);
+        Assert(File.ReadAllText(newFile) == "SYNTHETIC CURRENT DATA",
+            "Current vault data could not be restored");
+        Assert(vaults.List().Count == 0, "Restored files still appear in quarantine");
+    }
+    finally { Directory.Delete(baseDir, recursive: true); }
+    return Task.CompletedTask;
+}
+
+static Task DoesNotCreateLegacyVault()
+{
+    var baseDir = Path.Combine(Path.GetTempPath(), "ots-vault-registry-" + Guid.NewGuid().ToString("N"));
+    var current = Path.Combine(baseDir, "new");
+    var missingLegacy = Path.Combine(baseDir, "old-not-present");
+    try
+    {
+        var vaults = new QuarantineVaultRegistry(current, missingLegacy);
+        Assert(Directory.Exists(current), "Current vault was not initialized");
+        Assert(!Directory.Exists(missingLegacy), "Suite must not create a fake legacy vault");
+        Assert(vaults.List().Count == 0, "Empty vault reports unexpected records");
+    }
+    finally { if (Directory.Exists(baseDir)) Directory.Delete(baseDir, recursive: true); }
     return Task.CompletedTask;
 }
 

@@ -15,7 +15,7 @@ public partial class MainWindow : Window
     private Process? _engine;
     private CancellationTokenSource? _scanCancellation;
     private readonly WhiteAuditRunner _whiteAuditRunner = new();
-    private readonly QuarantineService _quarantine = new();
+    private readonly QuarantineVaultRegistry _quarantine = new();
     private readonly HashSet<string> _reviewed = new(StringComparer.Ordinal);
     private readonly string _engineDirectory = Path.Combine(AppContext.BaseDirectory, "engines");
     private string? _lastWhiteOutput;
