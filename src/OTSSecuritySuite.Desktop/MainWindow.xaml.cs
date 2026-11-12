@@ -160,6 +160,24 @@ public partial class MainWindow : Window
         catch (System.ComponentModel.Win32Exception) { } // OS denied termination.
     }
 
+    private async Task<string> ReadBoundedAuditOutputAsync(StreamReader reader, int maxCharacters, CancellationToken cancellation)
+    {
+        var builder = new StringBuilder();
+        var buffer = new char[8192];
+        while (true)
+        {
+            int count = await reader.ReadAsync(buffer.AsMemory(), cancellation);
+            if (count == 0) return builder.ToString();
+            if (count > maxCharacters - builder.Length)
+            {
+                // Do not let untrusted repository findings or broken CLI diagnostics grow without bound.
+                StopWhiteAuditProcess();
+                throw new InvalidDataException("Audit engine output exceeded its safe size limit.");
+            }
+            builder.Append(buffer, 0, count);
+        }
+    }
+
     private void CancelWhiteAudit(object sender, RoutedEventArgs e)
     {
         if (_whiteAuditCancellation is null) return;
@@ -202,8 +220,8 @@ public partial class MainWindow : Window
             try
             {
                 // Drain both pipes simultaneously to avoid child-process output deadlocks.
-                var stdout = process.StandardOutput.ReadToEndAsync(linked.Token);
-                var stderr = process.StandardError.ReadToEndAsync(linked.Token);
+                var stdout = ReadBoundedAuditOutputAsync(process.StandardOutput, 16 * 1024 * 1024, linked.Token);
+                var stderr = ReadBoundedAuditOutputAsync(process.StandardError, 128 * 1024, linked.Token);
                 await process.WaitForExitAsync(linked.Token);
                 string output = await stdout;
                 await stderr; // Drain for child liveness; do not display potentially sensitive raw stderr.
