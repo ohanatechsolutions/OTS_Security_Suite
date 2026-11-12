@@ -24,6 +24,26 @@ const MaxRemoteUnpackedBytes int64 = 192 << 20
 // extension records, which tar.Reader can consume before returning a file).
 const MaxRemoteDecompressedStreamBytes int64 = MaxRemoteUnpackedBytes + (64 << 20)
 
+// exhaustedStreamReader returns ErrCoverage rather than io.EOF at the
+// configured decompression limit. TAR parsers treat io.EOF as successful
+// archive termination, which would hide uninspected metadata or entries.
+type exhaustedStreamReader struct {
+    reader io.Reader
+    remaining int64
+}
+
+func (r *exhaustedStreamReader) Read(p []byte) (int, error) {
+    if r.remaining <= 0 {
+        return 0, ErrCoverage
+    }
+    if int64(len(p)) > r.remaining {
+        p = p[:int(r.remaining)]
+    }
+    n, err := r.reader.Read(p)
+    r.remaining -= int64(n)
+    return n, err
+}
+
 var ownerRepo = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,100}$`)
 
 // ParseRepo intentionally rejects private domains and unexpected URL paths (SSRF protection).
@@ -131,7 +151,7 @@ func scanRemoteArchiveContext(ctx context.Context, body io.Reader, report *Repor
 	defer gz.Close()
 	// Guard the complete decompressed byte stream, not just regular-file sizes;
 	// malicious metadata can otherwise cause unbounded decompression.
-	tr := tar.NewReader(io.LimitReader(gz, MaxRemoteDecompressedStreamBytes+1))
+	tr := tar.NewReader(&exhaustedStreamReader{reader: gz, remaining: MaxRemoteDecompressedStreamBytes})
 	entries := 0
 	var unpackedBytes int64
 	for {

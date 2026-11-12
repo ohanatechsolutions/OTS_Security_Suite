@@ -1,6 +1,8 @@
 package engine
 
 import (
+    "errors"
+    "io"
     "archive/tar"
     "bytes"
     "compress/gzip"
@@ -62,6 +64,23 @@ func TestRemoteArchiveRejectsBombSizedDeclaredEntryWithoutExpandingIt(t *testing
     }
     if len(report.Coverage) != 1 || !strings.Contains(report.Coverage[0].Reason, "decompression") {
         t.Fatalf("remote skip reason missing: %+v", report.Coverage)
+    }
+}
+
+func TestDecompressedBudgetFailsClosedInsteadOfFakingArchiveEOF(t *testing.T) {
+    limited := &exhaustedStreamReader{reader: strings.NewReader("12345"), remaining: 3}
+    output, err := io.ReadAll(limited)
+    if !errors.Is(err, ErrCoverage) {
+        t.Fatalf("expected hard resource limit, got EOF or other error: %v", err)
+    }
+    if string(output) != "123" {
+        t.Fatalf("limited content was not exactly bounded: %q", output)
+    }
+
+    within := &exhaustedStreamReader{reader: strings.NewReader("abc"), remaining: 4}
+    output, err = io.ReadAll(within)
+    if err != nil || string(output) != "abc" {
+        t.Fatalf("short decompressed stream failed unexpectedly: output=%q err=%v", output, err)
     }
 }
 
