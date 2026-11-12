@@ -133,6 +133,35 @@ jobs:
           $icon = [System.Drawing.Icon]::ExtractAssociatedIcon((Join-Path $installPath 'OTSSecuritySuite.exe'))
           if ($null -eq $icon) { throw 'Native host icon is missing' }
           $icon.Dispose()
+          $desktopExe = Join-Path $installPath 'OTSSecuritySuite.exe'
+          $desktop = Start-Process -FilePath $desktopExe -PassThru
+          try {
+            Start-Sleep -Seconds 7
+            $desktop.Refresh()
+            if ($desktop.HasExited) { throw "Installed WPF suite exited unexpectedly (code $($desktop.ExitCode))" }
+            Write-Host "Installed WPF suite stayed alive after launch (PID $($desktop.Id))"
+            if ($desktop.MainWindowHandle -ne [IntPtr]::Zero) {
+              $closed = $desktop.CloseMainWindow()
+              if (-not $closed -or -not $desktop.WaitForExit(15000)) {
+                throw 'Installed WPF suite did not close gracefully on window-close request'
+              }
+              Start-Sleep -Seconds 2
+              $survivors = @(Get-CimInstance Win32_Process -Filter "Name='OTSScannerEngine.exe'" | Where-Object { $_.ParentProcessId -eq $desktop.Id })
+              if ($survivors.Count -ne 0) { throw 'Embedded scanner engine survived normal window close' }
+              Write-Host 'Suite window close and immediate child-process cleanup verified'
+            } else {
+              Write-Host 'LIMITATION: CI session has no interactive main-window handle; GUI close and taskbar visuals NOT RUN'
+            }
+          }
+          finally {
+            $desktop.Refresh()
+            if (-not $desktop.HasExited) { Stop-Process -Id $desktop.Id -Force }
+            # CI cleanup only: a forced host kill does not exercise OnWindowClosing.
+            Get-CimInstance Win32_Process -Filter "Name='OTSScannerEngine.exe'" |
+              Where-Object { $_.ParentProcessId -eq $desktop.Id } |
+              ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+            $desktop.Dispose()
+          }
           $uninstall = Join-Path $installPath 'unins000.exe'
           if (-not (Test-Path $uninstall)) { throw 'Inno uninstaller is missing' }
           $remove = Start-Process -FilePath $uninstall -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
