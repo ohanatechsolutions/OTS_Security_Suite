@@ -43,6 +43,9 @@ jobs:
           Pop-Location
           python -m compileall -q tools
           python -m unittest discover -s tools -p 'test_*.py'
+          if ($LASTEXITCODE -ne 0) { throw 'Suite Python manifest tests failed' }
+          node --check extension/popup.js
+          if ($LASTEXITCODE -ne 0) { throw 'Chrome extension JS syntax check failed' }
       - name: Build Go scanner process
         shell: pwsh
         run: |
