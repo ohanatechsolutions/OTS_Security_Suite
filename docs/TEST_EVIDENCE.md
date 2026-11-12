@@ -1,9 +1,9 @@
 # OTS Security Suite — Test Evidence (actual results only)
 
-**Updated:** 2026-11-11 (Pacific/Honolulu)  
+**Updated:** 2026-11-11 21:12 (Pacific/Honolulu)  
 **Baseline main commit:** `d45de9592345e0b43acda4226004d72e2a181195`  
 **Active branch:** `work/white-audit-lifecycle-and-blueprint-20261111`  
-**Environment available in chat:** Linux x86_64 container, Python 3.13.5, Git 2.47.3, Go installed, Node 22; **no .NET SDK, Windows GUI or direct GitHub DNS**. GitHub connector has read/write access.
+**Environment:** Chat Linux session has no Windows/.NET GUI; code was tested on GitHub Actions `windows-latest` runner. See exact source SHA and workflow logs below. GitHub connector has repository write access.
 
 ## Recorded evidence
 
@@ -22,7 +22,33 @@
 | E-008 | REQ-005/007/008/009/010 | W.H.I.T.E. + Sanitizer cross-module VM end-to-end, encrypted quarantine restore | **NOT RUN** | NOT RUN |
 | E-009 | REQ-001/002/012/013 | GUI DPI, WebView2, custom protocol/Chrome, privacy/security verification | **NOT RUN** | NOT RUN |
 
-**Important:** Source changes E-003 do not make REQ-006 VERIFIED. Passing baseline CI E-002 cannot be carried forward as verification of later unbuilt commits. The Go count/heuristic labels, malware classifications, GUI icon, and signature have not been independently validated in this session.
+**Important:** Static source change E-003 alone is not verified; newer E-013..E-021 document Windows CI subprocess and installer checks. No interactive GUI acceptance for REQ-006 has been performed. Passing baseline CI E-002 cannot be carried forward as verification of later unbuilt commits. The Go count/heuristic labels, malware classifications, GUI icon, and signature have not been independently validated in this session.
+
+## Latest candidate: verified Windows CI results (supersedes old NOT RUN entries below where scoped)
+
+**Evidence source:** [GitHub Actions run 43172812782](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43172812782), `windows-latest`, commit `59243e6b15c61203bca39ef9cd95701f09cfa2e9`. Completed **SUCCESS** 2026-11-12 07:11 UTC (2026-11-11 21:11 HST). Workflow step-level success independently checked using GitHub Actions job ID `131029875670` and decoded job logs. The upload-artifact step was **SKIPPED INTENTIONALLY** for draft PR.
+
+| Evidence ID | Requirements | Command / observed output | Scope / result |
+|---|---|---|---|
+| E-013 | REQ-003/004/014 | Workflow `go test ./...`, `go vet ./...`; scanner 95-rule check and new synthetic TAR size/URL tests | **PASS** Windows CI Go unit and vet; accuracy corpus / external pentest NOT RUN |
+| E-014 | REQ-012/013 | `python -m unittest discover -s tools -p 'test_*.py'`, `node --check extension/popup.js` | **PASS** manifest least-privilege and extension syntax; clean Chrome install NOT RUN |
+| E-015 | REQ-005 | Pinned WHITE `python -m unittest discover -s tests -p 'test_*.py'`; log reports `Ran 36 tests ... OK` | **PASS** packaged source module tests; external OSV cache scenario NOT RUN |
+| E-016 | REQ-005/015 | `OTSWhiteAudit.exe` with synthetic one-file local repository; JSON complete exit=0, and non-Git `--history` JSON incomplete exit=2 | **PASS** executable invocation and expected incomplete contract |
+| E-017 | REQ-006/013/017 | `dotnet run --project tests/OTSSecuritySuite.AuditSmoke/OTSSecuritySuite.AuditSmoke.csproj -c Release`; log `Audit runner tests: 8/8 PASS` | **PASS** real process cancellation, timeout, size bounds, stderr privacy, concurrency, unsafe config; GUI click NOT RUN |
+| E-018 | REQ-007/011 | Sanitizer smoke and `dotnet publish` WPF and Sanitizer; workflow build steps success | **PASS** build and component smoke; Defender/DPAPI manual paths NOT RUN |
+| E-019 | REQ-002/004/011 | Started Go ephemeral local process; authenticated `/api/info` reports 95 rules, valid 200 session | **PASS** local engine session, not adversarial origin test |
+| E-020 | REQ-001/002/011/017 | Inno build & install; installed WPF `OTSSecuritySuite.exe` remained running, log `Installed WPF suite stayed alive after launch (PID 4304)`, then `Suite window close and immediate child-process cleanup verified` | **PASS** installed app launch, normal window close and immediate Go child exit on CI; no human visual/icon/Alt+Tab or W.H.I.T.E. close-mid-audit GUI acceptance |
+| E-021 | REQ-011/016 | Installer `MZ` PE header check, `Get-FileHash -Algorithm SHA256`, per-user install/URI registration/uninstall cleanup; logged `Installer, bundled modules, icon, URI registration and uninstaller smoke checks passed` | **PASS** CI installer smoke; clean independent Win10/Win11 upgrade/repair and Authenticode signature NOT RUN |
+
+**CI-generated installer SHA-256 (not released):**
+```text
+389DBCFE20AE5CB29EAA4F17B5360DEF0DD14841FA4DE7F767301289AFABF092  OTS-Security-Suite-Setup-x64.exe
+```
+The PR deliberately does not publish an artifact. An executable existing transiently on CI does not mean a public or user-accessible installer has been released.
+
+**Real CI failure and fix:** Run [43171854132](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43171854132) failed because PowerShell propagated an **expected** WHITE exit status 2 after validation. Code change reset `$global:LASTEXITCODE = 0` **only after** checking JSON incomplete and exit=2; subsequent final candidate CI run succeeded. Do not erase this regression record.
+
+**Still NOT RUN / release blockers:** independent Windows 10/11 fresh install, upgrade/downgrade and repair, signed-publisher provenance, real Chrome extension install, DPI/taskbar visuals, keyboard/screen reader, Defender denied/UAC, legacy encrypted quarantine/restore, cleanup/deletion fail-safe, actual user file false positives, privacy egress and external security review. These remain NO-GO irrespective of successful CI.
 
 ## Windows acceptance procedure for M1 / TEST-006 + TEST-017
 
@@ -39,22 +65,22 @@
 
 | Test ID | Target | Status |
 |---|---|---|
-| TEST-001 | WPF/taskbar titlebar logo and DPI sizing | NOT RUN |
-| TEST-002 | Go ephemeral session, WebView2 navigation and exit | baseline CI only; full test NOT RUN |
-| TEST-003 | Repo/file/folder/archive E2E and abusive inputs | NOT RUN |
-| TEST-004 | 95-rule/12-category mapping + meaningful fixtures | NOT RUN |
-| TEST-005 | W.H.I.T.E. real secrets/SAST/history/offline SCA | NOT RUN |
-| TEST-006 | Cancel/timeout/close and stale export | NOT RUN |
-| TEST-007 | Quick/Deep/Defender permissions | NOT RUN |
+| TEST-001 | WPF/taskbar titlebar logo and DPI sizing | WPF launch PASS CI; visual and DPI NOT RUN |
+| TEST-002 | Go ephemeral session, WebView2 navigation and exit | CI ephemeral session/normal close PASS; adversarial UI security NOT RUN |
+| TEST-003 | Repo/file/folder/archive E2E and abusive inputs | Go synthetic TAR/URL tests PASS; wider corpus NOT RUN |
+| TEST-004 | 95-rule/12-category mapping + meaningful fixtures | 95-rule/12-category assertion PASS; real accuracy corpus NOT RUN |
+| TEST-005 | W.H.I.T.E. real secrets/SAST/history/offline SCA | packaged benign+incomplete contract PASS; full scenarios NOT RUN |
+| TEST-006 | Cancel/timeout/close and stale export | 8/8 subprocess smoke PASS; interactive GUI mid-audit NOT RUN |
+| TEST-007 | Quick/Deep/Defender permissions | Sanitizer smoke PASS; manual permission paths NOT RUN |
 | TEST-008 | DPAPI quarantine + restore across old versions | NOT RUN |
 | TEST-009 | Investigate/review/destroy confirmation and denial | NOT RUN |
 | TEST-010 | Cleanup select/partial failures/denial | NOT RUN |
-| TEST-011 | Real Windows installer + upgrade/repair/uninstall | baseline CI smoke only; full test NOT RUN |
-| TEST-012 | Chrome extension + custom protocol clean install | NOT RUN |
-| TEST-013 | Local data/secret leak/egress controls | NOT RUN |
-| TEST-014 | Inventory, skipped and truncated verdict correctness | NOT RUN |
-| TEST-015 | Report export/invalid/empty/cancel states | NOT RUN |
-| TEST-016 | Signing, PE, hash and release decision | NOT RUN |
-| TEST-017 | No surviving spawned scanner/auditor after close | NOT RUN |
+| TEST-011 | Real Windows installer + upgrade/repair/uninstall | CI MZ/install/launch/close/URI/uninstall PASS; upgrade/repair/independent Win10/11 NOT RUN |
+| TEST-012 | Chrome extension + custom protocol clean install | manifest/JS & Windows URI registration PASS; clean Chrome profile NOT RUN |
+| TEST-013 | Local data/secret leak/egress controls | synthetic stderr privacy 8-test suite PASS; full egress NOT RUN |
+| TEST-014 | Inventory, skipped and truncated verdict correctness | Go synthetic limit/TAR tests PASS; broad coverage acceptance NOT RUN |
+| TEST-015 | Report export/invalid/empty/cancel states | packaged WHITE JSON output PASS; save/export UI NOT RUN |
+| TEST-016 | Signing, PE, hash and release decision | PE + hash PASS; signature/release decision NOT RUN |
+| TEST-017 | No surviving spawned scanner/auditor after close | CI WPF close-Go exit and WHITE subprocess tests PASS; UI close during WHITE audit NOT RUN |
 
 **NO-GO:** There is no verified production release. No external security certification is claimed.

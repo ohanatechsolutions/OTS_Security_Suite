@@ -62,4 +62,13 @@ The Windows quarantine system is user-scoped and cannot offer kernel-level malwa
 - `extension/`: locally launched repository scanner extension
 - `installer/`: Inno Setup packaging
 
-See [RELEASE-GATES](docs/RELEASE-GATES.md). This integration has not yet completed a Windows installer acceptance test or independent malware testing.
+See [BUILD_BLUEPRINT](docs/BUILD_BLUEPRINT.md), [PROJECT_STATUS](docs/PROJECT_STATUS.md), [TEST_EVIDENCE](docs/TEST_EVIDENCE.md) and [RELEASE-GATES](docs/RELEASE-GATES.md). An automated Windows CI installer launch/close and uninstall smoke **passed** for the draft branch; independent Win10/Win11, Chrome, quarantine/restore and malware corpus acceptance has **not** passed. No final publisher-signed release is available.
+
+### Draft branch build evidence — 2026-11-11 HST
+
+- Code commit `59243e6b15c6`, [GitHub Actions run 43172812782](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43172812782): **success** for Go tests/vet, 95 rule/12 category assertions, WHITE executable synthetic success/incomplete tests, 8/8 Windows process cancellation/timeout tests, Sanitizer smoke, WPF desktop build and launch/close, installer PE/hash/URI/uninstall.
+- Generated Inno Setup SHA-256: `389DBCFE20AE5CB29EAA4F17B5360DEF0DD14841FA4DE7F767301289AFABF092` for `OTS-Security-Suite-Setup-x64.exe`. **Not uploaded/published from the PR**.
+- Chrome extension uses `activeTab` only and has no permanent host permissions. Manifest/JS checks passed in CI; clean Chrome profile testing remains.
+- UI startup default is 1300×800 DIPs clamped to work area, but human DPI/taskbar verification still required.
+- Go scanner count refers to 95 regex heuristic rules across eight categories plus four built-in detection categories; the count is not a guarantee of malware detection quality.
+- **Status: integration beta, NOT approved for public release.** Existing standalone tools and encrypted quarantine remain preserved.
