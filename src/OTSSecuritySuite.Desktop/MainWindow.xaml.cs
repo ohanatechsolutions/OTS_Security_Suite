@@ -236,9 +236,25 @@ public partial class MainWindow : Window
 
     private void ExportWhiteReport(object sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrEmpty(_lastWhiteOutput)) { WhiteStatus.Text = "Run an audit before exporting."; return; }
-        var dialog = new SaveFileDialog { Filter = "JSON report|*.json", FileName = "OTS-White-Audit.json" };
-        if (dialog.ShowDialog(this) == true) File.WriteAllText(dialog.FileName, _lastWhiteOutput, Encoding.UTF8);
+        if (string.IsNullOrEmpty(_lastWhiteOutput))
+        {
+            WhiteStatus.Text = "Run an audit before exporting.";
+            return;
+        }
+        var dialog = new SaveFileDialog {
+            Filter = "JSON report|*.json", DefaultExt = ".json",
+            FileName = "OTS-White-Audit.json", OverwritePrompt = true
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            WhiteReportWriter.Save(dialog.FileName, _lastWhiteOutput);
+            WhiteStatus.Text = "Report saved to the selected file.";
+        }
+        catch (Exception ex)
+        {
+            WhiteStatus.Text = "Could not save report: " + ex.Message;
+        }
     }
 
     private async void RunQuick(object sender, RoutedEventArgs e) => await RunSystemScan(ScanMode.Quick);
