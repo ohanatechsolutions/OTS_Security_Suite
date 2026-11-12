@@ -3,6 +3,8 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 permissions:
   contents: read
 jobs:
@@ -129,6 +131,7 @@ jobs:
           if ($remove.ExitCode -ne 0) { throw "Silent uninstall failed: exit $($remove.ExitCode)" }
           Write-Host 'Installer, bundled modules, icon and uninstaller smoke checks passed'
       - name: Upload Windows installer (unsigned test build)
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: OTS-Security-Suite-Windows-Beta
