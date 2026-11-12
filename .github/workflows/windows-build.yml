@@ -81,6 +81,9 @@ jobs:
             if ($LASTEXITCODE -ne 2) { throw 'Non-git history audit should report exit code 2 (incomplete)' }
             $invalid = $invalidJson | ConvertFrom-Json
             if ($invalid.complete) { throw 'Incomplete W.H.I.T.E. audit was misreported as complete' }
+            # A nonzero exit is the EXPECTED outcome above; reset it so pwsh's
+            # GitHub Actions wrapper does not incorrectly mark this test step failed.
+            $global:LASTEXITCODE = 0
             Write-Host 'Packaged W.H.I.T.E. successful and incomplete JSON contracts verified'
           }
           finally { Remove-Item -Path $sample -Recurse -Force -ErrorAction SilentlyContinue }
