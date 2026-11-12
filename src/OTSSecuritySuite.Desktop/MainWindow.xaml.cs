@@ -226,24 +226,43 @@ public partial class MainWindow : Window
 
     private async void RunQuick(object sender, RoutedEventArgs e) => await RunSystemScan(ScanMode.Quick);
     private async void RunDeep(object sender, RoutedEventArgs e) => await RunSystemScan(ScanMode.Deep);
+    private void CancelSystemScan(object sender, RoutedEventArgs e)
+    {
+        if (_scanCancellation is not { IsCancellationRequested: false }) return;
+        SystemStatus.Text = "Cancelling Windows inspection...";
+        SystemCancel.IsEnabled = false;
+        _scanCancellation.Cancel();
+    }
     private async Task RunSystemScan(ScanMode mode)
     {
-        _scanCancellation?.Cancel();
-        _scanCancellation = new CancellationTokenSource();
+        if (!QuickButton.IsEnabled || !DeepButton.IsEnabled) return;
+        using var cancellation = new CancellationTokenSource();
+        _scanCancellation = cancellation;
         QuickButton.IsEnabled = DeepButton.IsEnabled = false;
+        SystemCancel.IsEnabled = true;
+        SystemFindings.ItemsSource = null; // Never reuse stale findings for a new scan.
         SystemStatus.Text = mode == ScanMode.Quick ? "Quick scan started..." : "Deep scan started...";
-        var progress = new Progress<ScanProgress>(p => { if (!_isClosing) SystemStatus.Text =
+        var progress = new Progress<ScanProgress>(p => { if (!_isClosing && !cancellation.IsCancellationRequested) SystemStatus.Text =
             $"{p.Phase} · {p.Files:N0} files reviewed · {p.Skipped:N0} inaccessible"; });
         try
         {
-            var result = await ThreatScanner.RunAsync(mode, progress, _scanCancellation.Token);
+            var result = await ThreatScanner.RunAsync(mode, progress, cancellation.Token);
+            if (_isClosing || cancellation.IsCancellationRequested) return;
             SystemFindings.ItemsSource = result.Findings;
             SystemStatus.Text = $"Scan finished · {result.Files:N0} files · {result.Findings.Count} findings · " +
                 $"{result.Skipped} inaccessible · {result.Elapsed:g}";
         }
-        catch (OperationCanceledException) { SystemStatus.Text = "Scan cancelled."; }
-        catch (Exception ex) { SystemStatus.Text = "Scan failed: " + ex.Message; }
-        finally { QuickButton.IsEnabled = DeepButton.IsEnabled = true; }
+        catch (OperationCanceledException) { if (!_isClosing) SystemStatus.Text = "Scan cancelled."; }
+        catch (Exception ex) { if (!_isClosing) SystemStatus.Text = "Scan failed: " + ex.Message; }
+        finally
+        {
+            if (ReferenceEquals(_scanCancellation, cancellation)) _scanCancellation = null;
+            if (!_isClosing)
+            {
+                QuickButton.IsEnabled = DeepButton.IsEnabled = true;
+                SystemCancel.IsEnabled = false;
+            }
+        }
     }
     private async void RunDefender(object sender, RoutedEventArgs e)
     {
