@@ -1,0 +1,167 @@
+using System.Diagnostics;
+using System.IO;
+using OTSSecuritySuite.Desktop;
+
+var cases = new (string Name, Func<Task> Action)[]
+{
+    ("bounded valid stdout and private stderr", ValidOutput),
+    ("nonzero exit code is faithfully returned", NonzeroExit),
+    ("user cancellation reaps process", Cancellation),
+    ("timeout reaps process", Timeout),
+    ("stdout overflow terminates process", StdoutOverflow),
+    ("stderr overflow terminates process", StderrOverflow),
+    ("only one concurrent audit is allowed", PreventDuplicates),
+    ("invalid shell and nonredirected process rejected", RejectUnsafeConfiguration),
+};
+int passed = 0;
+foreach (var (name, action) in cases)
+{
+    try
+    {
+        await action();
+        Console.WriteLine("PASS " + name);
+        passed++;
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine("FAIL " + name + " : " + ex);
+    }
+}
+Console.WriteLine($"Audit runner tests: {passed}/{cases.Length} PASS");
+return passed == cases.Length ? 0 : 1;
+
+static ProcessStartInfo Powershell(string command)
+{
+    var psi = new ProcessStartInfo("powershell.exe")
+    {
+        UseShellExecute = false,
+        CreateNoWindow = true,
+        RedirectStandardOutput = true,
+        RedirectStandardError = true
+    };
+    psi.ArgumentList.Add("-NoProfile");
+    psi.ArgumentList.Add("-NonInteractive");
+    psi.ArgumentList.Add("-Command");
+    psi.ArgumentList.Add(command);
+    return psi;
+}
+
+static async Task ValidOutput()
+{
+    var runner = new WhiteAuditRunner();
+    var report = await runner.RunAsync(
+        Powershell("[Console]::Error.WriteLine('SYNTHETIC_PRIVATE_SENTINEL'); [Console]::Out.Write('{}')"),
+        TimeSpan.FromSeconds(15));
+    Assert(report.ExitCode == 0, "Expected success exit code");
+    Assert(report.StandardOutput.Trim() == "{}", "Expected only JSON stdout, never stderr");
+    Assert(!report.StandardOutput.Contains("SYNTHETIC_PRIVATE_SENTINEL"), "Secret from stderr leaked");
+    Assert(!runner.IsRunning, "Runner remained active after result");
+}
+
+static async Task NonzeroExit()
+{
+    var runner = new WhiteAuditRunner();
+    var output = await runner.RunAsync(Powershell("[Console]::Out.Write('{}'); exit 7"), TimeSpan.FromSeconds(15));
+    Assert(output.ExitCode == 7, "Unexpected nonzero exit was normalized to success");
+}
+
+static async Task Cancellation()
+{
+    var runner = new WhiteAuditRunner();
+    var running = runner.RunAsync(Powershell("Start-Sleep -Seconds 20"), TimeSpan.FromSeconds(30));
+    int pid = await WaitForPid(runner);
+    runner.Cancel();
+    await Expect<OperationCanceledException>(running);
+    await AssertExited(pid);
+    Assert(!runner.IsRunning, "Runner remained busy after cancel");
+}
+
+static async Task Timeout()
+{
+    var runner = new WhiteAuditRunner();
+    var running = runner.RunAsync(Powershell("Start-Sleep -Seconds 20"), TimeSpan.FromMilliseconds(700));
+    int pid = await WaitForPid(runner);
+    await Expect<TimeoutException>(running);
+    await AssertExited(pid);
+}
+
+static async Task StdoutOverflow()
+{
+    var runner = new WhiteAuditRunner();
+    await Expect<InvalidDataException>(runner.RunAsync(
+        Powershell("[Console]::Out.Write(('A' * 20000))"),
+        TimeSpan.FromSeconds(15), maxStdoutCharacters: 1024));
+    Assert(!runner.IsRunning, "Runner still active after stdout overflow");
+}
+
+static async Task StderrOverflow()
+{
+    var runner = new WhiteAuditRunner();
+    await Expect<InvalidDataException>(runner.RunAsync(
+        Powershell("[Console]::Error.Write(('X' * 20000)); [Console]::Out.Write('{}')"),
+        TimeSpan.FromSeconds(15), maxStderrCharacters: 1024));
+    Assert(!runner.IsRunning, "Runner still active after stderr overflow");
+}
+
+static async Task PreventDuplicates()
+{
+    var runner = new WhiteAuditRunner();
+    var running = runner.RunAsync(Powershell("Start-Sleep -Seconds 20"), TimeSpan.FromSeconds(30));
+    int pid = await WaitForPid(runner);
+    try
+    {
+        await Expect<InvalidOperationException>(runner.RunAsync(Powershell("[Console]::Out.Write('{}')"),
+            TimeSpan.FromSeconds(10)));
+    }
+    finally
+    {
+        runner.Cancel();
+        await Expect<OperationCanceledException>(running);
+        await AssertExited(pid);
+    }
+}
+
+static async Task RejectUnsafeConfiguration()
+{
+    var runner = new WhiteAuditRunner();
+    var invalid = new ProcessStartInfo("powershell.exe") { UseShellExecute = true };
+    await Expect<ArgumentException>(runner.RunAsync(invalid, TimeSpan.FromSeconds(10)));
+    Assert(!runner.IsRunning, "Invalid configuration left runner busy");
+}
+
+static async Task<int> WaitForPid(WhiteAuditRunner runner)
+{
+    for (int i = 0; i < 150; i++)
+    {
+        if (runner.ActiveProcessId is int pid) return pid;
+        await Task.Delay(20);
+    }
+    throw new Exception("Process did not start in 3 seconds");
+}
+
+static async Task AssertExited(int pid)
+{
+    for (int i = 0; i < 100; i++)
+    {
+        try
+        {
+            using var child = Process.GetProcessById(pid);
+            if (child.HasExited) return;
+        }
+        catch (ArgumentException) { return; }
+        await Task.Delay(20);
+    }
+    throw new Exception("Child PID " + pid + " survived termination for over two seconds");
+}
+
+static async Task Expect<T>(Task action) where T : Exception
+{
+    try { await action; }
+    catch (T) { return; }
+    throw new Exception("Expected exception " + typeof(T).Name);
+}
+
+static void Assert(bool condition, string message)
+{
+    if (!condition) throw new Exception(message);
+}
