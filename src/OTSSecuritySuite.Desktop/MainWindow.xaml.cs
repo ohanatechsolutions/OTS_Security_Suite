@@ -206,11 +206,21 @@ public partial class MainWindow : Window
                 var stderr = process.StandardError.ReadToEndAsync(linked.Token);
                 await process.WaitForExitAsync(linked.Token);
                 string output = await stdout;
-                string errors = await stderr;
+                await stderr; // Drain for child liveness; do not display potentially sensitive raw stderr.
                 linked.Token.ThrowIfCancellationRequested();
                 if (_isClosing) return;
+                if (string.IsNullOrWhiteSpace(output))
+                {
+                    WhiteStatus.Text = "Audit returned no JSON report. Check the audit configuration and retry.";
+                    return;
+                }
+                using (var report = System.Text.Json.JsonDocument.Parse(output))
+                {
+                    if (report.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object)
+                        throw new InvalidDataException("Audit output did not contain a JSON report object.");
+                }
                 _lastWhiteOutput = output;
-                WhiteOutput.Text = output.Length == 0 ? errors : output;
+                WhiteOutput.Text = output;
                 WhiteStatus.Text = process.ExitCode switch {
                     0 => "Audit completed · no findings at the configured failure threshold",
                     1 => "Audit completed · findings require review",
@@ -229,8 +239,8 @@ public partial class MainWindow : Window
         {
             if (!_isClosing)
                 WhiteStatus.Text = timeout.IsCancellationRequested
-                    ? "Audit timed out after 12 minutes; child process stopped."
-                    : "Audit cancelled; child process stopped.";
+                    ? "Audit timed out after 12 minutes; termination requested."
+                    : "Audit cancelled; termination requested.";
         }
         catch (Exception ex)
         {
