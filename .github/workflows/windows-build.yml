@@ -177,6 +177,8 @@ jobs:
             if ($desktop.HasExited) { throw "Installed WPF suite exited unexpectedly (code $($desktop.ExitCode))" }
             Write-Host "Installed WPF suite stayed alive after launch (PID $($desktop.Id))"
             if ($desktop.MainWindowHandle -ne [IntPtr]::Zero) {
+              & pwsh -NoProfile -File tools/windows-ui-smoke.ps1 -WindowHandle $desktop.MainWindowHandle.ToInt64()
+              if ($LASTEXITCODE -ne 0) { throw 'Installed WPF navigation/WHITE UI smoke failed' }
               $closed = $desktop.CloseMainWindow()
               if (-not $closed -or -not $desktop.WaitForExit(15000)) {
                 throw 'Installed WPF suite did not close gracefully on window-close request'
