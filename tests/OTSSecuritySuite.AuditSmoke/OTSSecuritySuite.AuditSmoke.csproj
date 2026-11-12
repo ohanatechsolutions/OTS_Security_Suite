@@ -9,5 +9,6 @@
   <ItemGroup>
     <!-- Exercise the exact production runner without starting WPF or bringing in a test framework. -->
     <Compile Include="../../src/OTSSecuritySuite.Desktop/WhiteAuditRunner.cs" Link="WhiteAuditRunner.cs" />
+    <Compile Include="../../src/OTSSecuritySuite.Desktop/WhiteReportWriter.cs" Link="WhiteReportWriter.cs" />
   </ItemGroup>
 </Project>
