@@ -195,7 +195,7 @@ jobs:
               ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
             $desktop.Dispose()
           }
-          $protocolKey = Get-Item 'HKCU:\\Software\\Classes\\ots-security\\shell\\open\\command' -ErrorAction Stop
+          $protocolKey = Get-Item 'HKCU:\Software\Classes\ots-security\\shell\\open\\command' -ErrorAction Stop
           if (-not ($protocolKey.GetValue('') -like '*OTSSecuritySuite.exe*')) {
             throw 'Installed custom URL protocol command is missing or incorrect'
           }
@@ -203,7 +203,7 @@ jobs:
           if (-not (Test-Path $uninstall)) { throw 'Inno uninstaller is missing' }
           $remove = Start-Process -FilePath $uninstall -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
           if ($remove.ExitCode -ne 0) { throw "Silent uninstall failed: exit $($remove.ExitCode)" }
-          if (Test-Path 'HKCU:\\Software\\Classes\\ots-security') { throw 'Uninstall left custom protocol registration behind' }
+          if (Test-Path 'HKCU:\Software\Classes\ots-security') { throw 'Uninstall left custom protocol registration behind' }
           if (Test-Path $desktopExe) { throw 'Uninstall left main EXE behind' }
           Write-Host 'Installer, bundled modules, icon, URI registration and uninstaller smoke checks passed'
       - name: Upload Windows installer (unsigned test build)
