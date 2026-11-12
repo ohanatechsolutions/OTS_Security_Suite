@@ -18,6 +18,7 @@ var cases = new (string Name, Func<Task> Action)[]
     ("quarantine registry does not create a legacy vault", DoesNotCreateLegacyVault),
     ("WHITE JSON contract cannot report inconsistent results as clean", WhiteReportConsistency),
     ("WHITE JSON contract rejects mismatched or incomplete schemas", WhiteReportSchema),
+    ("quarantine review authorization binds exact vault and hash", QuarantineReviewIdentity),
 };
 int passed = 0;
 foreach (var (name, action) in cases)
@@ -264,6 +265,23 @@ static Task WhiteReportSchema()
         }
         catch (InvalidDataException) { }
     }
+    return Task.CompletedTask;
+}
+
+static Task QuarantineReviewIdentity()
+{
+    var original = new OTSSystemSanitizer.Core.QuarantinedFile(
+        Guid.NewGuid().ToString("N"), "C:\\Users\\fixture\\file.exe",
+        "C:\\Users\\fixture\\current\\file.aegq",
+        "AAA", DateTimeOffset.UtcNow, "synthetic-protected-key", DateTime.UtcNow, FileAttributes.Normal);
+    var reviewed = QuarantineVaultRegistry.ReviewIdentity(original);
+    Assert(reviewed != QuarantineVaultRegistry.ReviewIdentity(original with {
+        VaultFile = "C:\\Users\\fixture\\legacy\\file.aegq"
+    }), "Review of current vault authorized same ID in legacy vault");
+    Assert(reviewed != QuarantineVaultRegistry.ReviewIdentity(original with { Sha256 = "BBB" }),
+        "Review authorization reused after vault file hash changed");
+    Assert(reviewed == QuarantineVaultRegistry.ReviewIdentity(original),
+        "Review authorization key unstable for the same manifest");
     return Task.CompletedTask;
 }
 

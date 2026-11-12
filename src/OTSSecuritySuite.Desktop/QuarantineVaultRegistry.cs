@@ -30,6 +30,15 @@ public sealed class QuarantineVaultRegistry
         }
     }
 
+    // Review authorization is scoped to one exact encrypted manifest identity
+    // rather than an ID that could be reused across two historical vault roots.
+    public static string ReviewIdentity(QuarantinedFile item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        return item.Id + "|" + Path.GetFullPath(item.VaultFile).ToUpperInvariant()
+             + "|" + item.Sha256.ToUpperInvariant();
+    }
+
     public IReadOnlyList<QuarantinedFile> List()
     {
         var items = _current.List().ToList();

@@ -332,13 +332,30 @@ public partial class MainWindow : Window
         catch (Exception ex) { SystemStatus.Text = "Quarantine failed: " + ex.Message; }
     }
     private void RefreshQuarantine(object sender, RoutedEventArgs e) => RefreshVault();
-    private void RefreshVault() => QuarantineItems.ItemsSource = _quarantine.List();
+    private void RefreshVault()
+    {
+        _reviewed.Clear(); // Never reuse approval after contents of the vault change.
+        try
+        {
+            QuarantineItems.ItemsSource = _quarantine.List();
+        }
+        catch (IOException ex)
+        {
+            QuarantineItems.ItemsSource = null;
+            CleanupStatus.Text = "Quarantine listing unavailable: " + ex.Message;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            QuarantineItems.ItemsSource = null;
+            CleanupStatus.Text = "Quarantine access denied: " + ex.Message;
+        }
+    }
     private void InvestigateQuarantined(object sender, RoutedEventArgs e)
     {
         if (QuarantineItems.SelectedItem is not QuarantinedFile item) return;
         MessageBox.Show(this, ThreatInvestigator.QuarantineReport(item), "Quarantine review",
             MessageBoxButton.OK, MessageBoxImage.Information);
-        _reviewed.Add(item.Id);
+        _reviewed.Add(QuarantineVaultRegistry.ReviewIdentity(item));
     }
     private void RestoreQuarantined(object sender, RoutedEventArgs e)
     {
@@ -351,10 +368,10 @@ public partial class MainWindow : Window
     private void DestroyQuarantined(object sender, RoutedEventArgs e)
     {
         if (QuarantineItems.SelectedItem is not QuarantinedFile item) return;
-        if (!_reviewed.Contains(item.Id)) { CleanupStatus.Text = "Review the selected quarantine item before destroying it."; return; }
+        if (!_reviewed.Contains(QuarantineVaultRegistry.ReviewIdentity(item))) { CleanupStatus.Text = "Review the selected quarantine item before destroying it."; return; }
         if (MessageBox.Show(this, "PERMANENTLY destroy this reviewed quarantine item? This cannot be undone.\n"+item.OriginalPath,
             "Permanent removal", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-        try { _quarantine.Destroy(item); _reviewed.Remove(item.Id); RefreshVault(); CleanupStatus.Text = "Reviewed quarantine item removed."; }
+        try { _quarantine.Destroy(item); _reviewed.Remove(QuarantineVaultRegistry.ReviewIdentity(item)); RefreshVault(); CleanupStatus.Text = "Reviewed quarantine item removed."; }
         catch (Exception ex) { CleanupStatus.Text = "Removal failed: " + ex.Message; }
     }
     private void DiscoverCleanup(object sender, RoutedEventArgs e)
