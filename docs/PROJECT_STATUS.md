@@ -4,6 +4,7 @@
 **Repo:** `ohanatechsolutions/OTS_Security_Suite`  
 **Inspected baseline:** `main@d45de9592345e0b43acda4226004d72e2a181195`  
 **Active work branch:** `work/white-audit-lifecycle-and-blueprint-20261111`  
+**Draft PR:** [#2](https://github.com/ohanatechsolutions/OTS_Security_Suite/pull/2) — review only, not merged  
 **Overall:** **IN PROGRESS — NOT SHIP-READY**  
 **Reference:** `BUILD_BLUEPRINT.md`, `TEST_EVIDENCE.md`, `RELEASE-GATES.md`.
 
@@ -48,7 +49,7 @@
 
 ## Change set and exact continuation
 
-- `src/OTSSecuritySuite.Desktop/MainWindow.xaml.cs`: link W.H.I.T.E. cancel to timeout and suite close; process-tree kill attempt; clear stale export, maintain single audit; cap output and reject invalid JSON.
+- `src/OTSSecuritySuite.Desktop/MainWindow.xaml.cs`: link W.H.I.T.E. cancel to timeout and suite close; process-tree kill attempt; clear stale export, maintain single audit; cap output, reject invalid JSON and unrecognized process exit codes.
 - `src/OTSSecuritySuite.Desktop/MainWindow.xaml`: wired **CANCEL AUDIT** button with initially disabled state.
 - `docs/BUILD_BLUEPRINT.md`: scope, acceptance, architecture, threats and roadmap.
 - `docs/PROJECT_STATUS.md`, `docs/TEST_EVIDENCE.md`: truth ledger; `docs/RELEASE-GATES.md`: NO-GO controls.
