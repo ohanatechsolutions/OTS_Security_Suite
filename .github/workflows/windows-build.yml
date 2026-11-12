@@ -115,6 +115,24 @@ jobs:
           foreach ($path in @('bundle/OTSSecuritySuite.exe','bundle/engines/OTSWhiteAudit.exe','bundle/engines/OTSScannerEngine.exe','bundle/engines/OTSSystemSanitizer.exe')) {
             if (-not (Test-Path $path)) { throw "Missing output $path" }
           }
+      - name: Preserve upstream MIT license and third-party attribution in installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force bundle/licenses | Out-Null
+          $required = @(
+            @('modules/OTS_WHITE/LICENSE', 'bundle/licenses/OTS_WHITE_LICENSE.txt'),
+            @('modules/OTS_WHITE/THIRD_PARTY_NOTICES.md', 'bundle/licenses/OTS_WHITE_THIRD_PARTY_NOTICES.md'),
+            @('modules/OTS_System_Sanitizer/LICENSE', 'bundle/licenses/OTS_System_Sanitizer_LICENSE.txt'),
+            @('modules/OTS_System_Sanitizer/THIRD_PARTY_NOTICES.md', 'bundle/licenses/OTS_System_Sanitizer_THIRD_PARTY_NOTICES.md'),
+            @('scanner/NOTICE.md', 'bundle/licenses/RepoScan_NOTICE.md')
+          )
+          foreach ($pair in $required) {
+            if (-not (Test-Path -LiteralPath $pair[0])) { throw "Missing legal attribution: $($pair[0])" }
+            Copy-Item -LiteralPath $pair[0] -Destination $pair[1] -Force
+            if ((Get-Item -LiteralPath $pair[1]).Length -eq 0) { throw "Empty legal attribution: $($pair[1])" }
+          }
+          Write-Host 'All pinned module licenses and notices staged for installer'
       - name: Inno Setup
         shell: pwsh
         run: |
@@ -173,7 +191,7 @@ jobs:
           $setup = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-') -Wait -PassThru
           if ($setup.ExitCode -ne 0) { throw "Silent setup failed: exit $($setup.ExitCode)" }
           $installPath = Join-Path $env:LOCALAPPDATA 'Programs/Ohana Tech Solutions/Security Suite'
-          foreach ($required in @('OTSSecuritySuite.exe','engines/OTSScannerEngine.exe','engines/OTSWhiteAudit.exe','engines/OTSSystemSanitizer.exe','extension/manifest.json','extension/popup.js')) {
+          foreach ($required in @('OTSSecuritySuite.exe','engines/OTSScannerEngine.exe','engines/OTSWhiteAudit.exe','engines/OTSSystemSanitizer.exe','extension/manifest.json','extension/popup.js','licenses/OTS_WHITE_LICENSE.txt','licenses/OTS_WHITE_THIRD_PARTY_NOTICES.md','licenses/OTS_System_Sanitizer_LICENSE.txt','licenses/OTS_System_Sanitizer_THIRD_PARTY_NOTICES.md','licenses/RepoScan_NOTICE.md')) {
             if (-not (Test-Path (Join-Path $installPath $required))) { throw "Installer missing $required" }
           }
           Add-Type -AssemblyName System.Drawing
