@@ -247,7 +247,12 @@ public partial class MainWindow : Window
         try
         {
             var result = await ThreatScanner.RunAsync(mode, progress, cancellation.Token);
-            if (_isClosing || cancellation.IsCancellationRequested) return;
+            if (_isClosing) return;
+            if (result.Cancelled || cancellation.IsCancellationRequested)
+            {
+                SystemStatus.Text = $"Scan cancelled · {result.Files:N0} files reviewed before cancellation.";
+                return;
+            }
             SystemFindings.ItemsSource = result.Findings;
             SystemStatus.Text = $"Scan finished · {result.Files:N0} files · {result.Findings.Count} findings · " +
                 $"{result.Skipped} inaccessible · {result.Elapsed:g}";
