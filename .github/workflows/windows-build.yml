@@ -49,6 +49,24 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Suite Python manifest tests failed' }
           node --check extension/popup.js
           if ($LASTEXITCODE -ne 0) { throw 'Chrome extension JS syntax check failed' }
+          # Verify the supplied brand PNG genuinely has transparent pixels.
+          # Metadata/filename alone cannot prove the black background was removed.
+          Add-Type -AssemblyName System.Drawing
+          $image = [System.Drawing.Bitmap]::new((Resolve-Path 'src/OTSSecuritySuite.Desktop/OhanaLogo.png').Path)
+          try {
+            $hasTransparency = $false
+            $dx = [Math]::Max(1, [int]([Math]::Floor($image.Width / 24)))
+            $dy = [Math]::Max(1, [int]([Math]::Floor($image.Height / 24)))
+            for ($x=0; $x -lt $image.Width; $x += $dx) {
+              for ($y=0; $y -lt $image.Height; $y += $dy) {
+                if ($image.GetPixel($x,$y).A -lt 240) { $hasTransparency = $true; break }
+              }
+              if ($hasTransparency) { break }
+            }
+            if (-not $hasTransparency) { throw 'Brand logo PNG has no transparent sampled pixels' }
+            Write-Host "OTS logo PNG transparency verified ($($image.Width)x$($image.Height))"
+          }
+          finally { $image.Dispose() }
       - name: Build Go scanner process
         shell: pwsh
         run: |
