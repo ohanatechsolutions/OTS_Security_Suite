@@ -17,6 +17,9 @@ class ReleaseManifestTests(unittest.TestCase):
     def test_extension_manifest_valid(self):
         m = json.loads((ROOT/'extension/manifest.json').read_text(encoding="utf-8"))
         self.assertEqual(m['manifest_version'],3)
+        self.assertEqual(m['permissions'], ['activeTab'])
+        self.assertNotIn('host_permissions', m, "Popup URL lookup requires no permanent host privileges")
+        self.assertNotIn('tabs', m['permissions'], "Avoid access to unrelated browser tabs")
         self.assertNotIn('http://127.0.0.1:48728', (ROOT/'extension/popup.js').read_text(encoding="utf-8"))
     def test_submodule_locations(self):
         m = (ROOT/'.gitmodules').read_text(encoding="utf-8")
