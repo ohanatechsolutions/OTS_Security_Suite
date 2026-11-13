@@ -117,6 +117,12 @@ jobs:
             $safePath = ([string]$finding.path) -replace '[\r\n\x00-\x1f]', '_'
             Write-Host "WHITE TRIAGE metadata-only: $safeRule at ${safePath}:$($finding.line)"
           }
+          # A source-audit run must fail on any unreviewed high/critical finding.
+          # Never downgrade to --fail-on none without this independent assertion.
+          $highSeverity = @($report.findings | Where-Object { $_.severity -in @('critical','high') })
+          if ($highSeverity.Count -ne 0) {
+            throw "Unresolved HIGH/CRITICAL source-audit findings: $($highSeverity.Count); inspect metadata and source privately"
+          }
           # This test covers worktree secrets/SAST only; not history, offline OSV,
           # external penetration testing or binary payload correctness.
           $global:LASTEXITCODE = 0
