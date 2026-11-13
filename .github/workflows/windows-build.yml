@@ -51,7 +51,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Chrome extension JS syntax check failed' }
           node tools/test_extension.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Chrome popup security contract tests failed' }
-          foreach ($p in @('tools/sign-windows-release.ps1','tools/verify-windows-release.ps1')) {
+          foreach ($p in @('tools/sign-windows-release.ps1','tools/verify-windows-release.ps1','tools/collect-windows-qa.ps1')) {
             $tokens = $null; $parseErrors = $null
             [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p).Path,[ref]$tokens,[ref]$parseErrors) | Out-Null
             if ($parseErrors.Count -ne 0) { throw "Release-script parse failed: $p" }
@@ -228,6 +228,16 @@ jobs:
           if ($null -eq $icon) { throw 'Native host icon is missing' }
           $icon.Dispose()
           $desktopExe = Join-Path $installPath 'OTSSecuritySuite.exe'
+          # Non-destructive preflight is compatible with built-in Windows PowerShell.
+          $preflightPath = Join-Path $env:TEMP ('ots-suite-qa-' + [Guid]::NewGuid().ToString('N') + '.json')
+          & powershell.exe -NoProfile -File tools/collect-windows-qa.ps1 -OutputPath $preflightPath
+          if ($LASTEXITCODE -ne 0) { throw 'Read-only Windows QA preflight did not complete' }
+          $preflight = Get-Content -LiteralPath $preflightPath -Raw | ConvertFrom-Json
+          if (-not $preflight.application.installed -or
+              -not $preflight.application.native_protocol_targets_suite -or
+              -not $preflight.windows.build) { throw 'QA preflight reported a missing installed-app gate' }
+          Remove-Item -LiteralPath $preflightPath -Force
+          Write-Host 'Windows PowerShell read-only install/protocol QA preflight verified'
           $desktop = Start-Process -FilePath $desktopExe -PassThru
           try {
             Start-Sleep -Seconds 7
