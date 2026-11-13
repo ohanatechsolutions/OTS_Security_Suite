@@ -253,6 +253,9 @@ func (s *Server) save(report *engine.Report) error {
 	}
 	data, err := engine.ReportJSON(report)
 	if err != nil { return err }
+	if int64(len(data)) > maxStoredReportBytes {
+		return errors.New("report too large for validated local history; scan coverage must be reduced")
+	}
 	tmp, err := os.CreateTemp(s.reportsDir, ".ots-report-*.tmp")
 	if err != nil { return err }
 	stage := tmp.Name()
@@ -300,7 +303,6 @@ func (s *Server) scan(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 400)
 		return
 	}
-	if r.Context().Err() != nil { return }
 	if r.Context().Err() != nil { return }
 	if err := s.save(report); err != nil {
 		http.Error(w, "Could not save local scan report. Check available disk space and folder permissions.", http.StatusInsufficientStorage)
@@ -391,7 +393,8 @@ func (s *Server) readStoredReport(id string) ([]byte, *engine.Report, error) {
 	}
 	var parsed engine.Report
 	if json.Unmarshal(data, &parsed) != nil || parsed.ID != id ||
-		parsed.ID == "" || parsed.RulesAvailable < 0 {
+		parsed.ID == "" || parsed.Engine == "" || parsed.Target == "" ||
+		parsed.RulesAvailable <= 0 {
 		return nil, nil, errors.New("local report metadata does not match filename")
 	}
 	return data, &parsed, nil

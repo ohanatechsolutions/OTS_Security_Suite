@@ -185,3 +185,28 @@ func TestHistorySkipsForgedOrOversizedLocalReports(t *testing.T) {
 		t.Fatal("valid report not served privately and without caching")
 	}
 }
+
+func TestReportSavingRejectsOversizeBeforeHistoryCommit(t *testing.T) {
+	s := newSecurityFixture(t)
+	record := engine.NewReport(strings.Repeat("x", int(maxStoredReportBytes)+1), "fixture")
+	if err := s.save(record); err == nil {
+		t.Fatal("oversized history record was persisted without a visible storage error")
+	}
+	files, err := os.ReadDir(s.reportsDir)
+	if err != nil || len(files) != 0 {
+		t.Fatalf("oversized report left partial history: %v %v", files, err)
+	}
+}
+
+func TestHistoryRejectsMinimalSpoofedReport(t *testing.T) {
+	s := newSecurityFixture(t)
+	id := "1712345678900000009"
+	if err := os.WriteFile(filepath.Join(s.reportsDir,id+".json"),
+		[]byte(`{"id":"`+id+`"}`),0600); err != nil { t.Fatal(err) }
+	rec := httptest.NewRecorder()
+	req := requestWithCookie("GET","http://127.0.0.1:54321/api/report/"+id,"",s.secret,"")
+	s.withAuth(s.report)(rec,req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("spoofed minimal JSON was accepted as valid report: %d",rec.Code)
+	}
+}
