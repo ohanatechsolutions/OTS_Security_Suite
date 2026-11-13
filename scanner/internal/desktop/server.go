@@ -28,37 +28,7 @@ var assets embed.FS
 
 const Addr = "127.0.0.1:48728"
 
-var idPattern = regexp.MustCompile(`^\d{10,24}package desktop
-
-import (
-	"context"
-	"errors"
-	"crypto/rand"
-	"crypto/subtle"
-	"embed"
-	"encoding/hex"
-	"encoding/json"
-	"fmt"
-	"io"
-	"net"
-	"net/http"
-	"os"
-	"path/filepath"
-	"regexp"
-	"sort"
-	"strings"
-	"sync"
-	"time"
-
-	"ots/github-malware-scanner/internal/engine"
-)
-
-//go:embed assets/*
-var assets embed.FS
-
-const Addr = "127.0.0.1:48728"
-
-)
+var idPattern = regexp.MustCompile(`^\\d{10,24}$`)
 
 // History is local user-controlled data; never trust an on-disk JSON file's
 // basename, claimed ID, type, or byte count without revalidation.
