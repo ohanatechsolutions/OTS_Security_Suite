@@ -19,6 +19,8 @@ var cases = new (string Name, Func<Task> Action)[]
     ("WHITE JSON contract cannot report inconsistent results as clean", WhiteReportConsistency),
     ("WHITE JSON contract rejects mismatched or incomplete schemas", WhiteReportSchema),
     ("quarantine review authorization binds exact vault and hash", QuarantineReviewIdentity),
+    ("only one suite per user session owns the activation pipe", SingleInstanceForwarding),
+    ("native protocol rejects unsafe repository URL arguments", ProtocolRejectsUnsafeUrls),
 };
 int passed = 0;
 foreach (var (name, action) in cases)
@@ -282,6 +284,49 @@ static Task QuarantineReviewIdentity()
         "Review authorization reused after vault file hash changed");
     Assert(reviewed == QuarantineVaultRegistry.ReviewIdentity(original),
         "Review authorization key unstable for the same manifest");
+    return Task.CompletedTask;
+}
+
+static async Task SingleInstanceForwarding()
+{
+    var scope = "CI-" + Guid.NewGuid().ToString("N");
+    using var primary = new ProtocolActivation(scope);
+    using var secondary = new ProtocolActivation(scope);
+    Assert(primary.TryBecomePrimary(), "First suite process could not acquire instance identity");
+    Assert(!secondary.TryBecomePrimary(), "Second instance incorrectly became primary");
+
+    var received = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+    primary.StartListening(uri => received.TrySetResult(uri));
+    const string action = "ots-security://scan?url=https%3A%2F%2Fgithub.com%2Fexample%2Frepo";
+    Assert(await secondary.SendToPrimaryAsync(action), "Secondary protocol handoff failed");
+    var message = await received.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    Assert(message == action, "Protocol was modified during IPC handoff");
+}
+
+static Task ProtocolRejectsUnsafeUrls()
+{
+    var okay = new[] {
+        "ots-security://scan",
+        "ots-security://scan?url=https%3A%2F%2Fgithub.com%2Fuser%2Frepo",
+        "ots-security://scan?url=https%3A%2F%2Fbitbucket.org%2Fowner%2Frepo.git",
+    };
+    foreach (var sample in okay)
+        Assert(TrustedProtocol.TryParse(sample, out _), "Rejected legitimate protocol: " + sample);
+
+    var blocked = new[] {
+        "https://github.com/user/repo",
+        "ots-security://other?url=https%3A%2F%2Fgithub.com%2Fa%2Fb",
+        "ots-security://scan?url=https%3A%2F%2Fgithub.com.evil.tld%2Fa%2Fb",
+        "ots-security://scan?url=http%3A%2F%2Fgithub.com%2Fa%2Fb",
+        "ots-security://scan?url=https%3A%2F%2Fgithub.com%2Fa%2Fb%2Ftree%2Fmain",
+        "ots-security://scan?url=https%3A%2F%2Fgithub.com%2Fa%2Fb%3Ftoken%3Dx",
+        "ots-security://scan?url=https%3A%2F%2Fgithub.com%2Fa%2F..%2Fb",
+        "ots-security://scan?url=https%3A%2F%2Flocalhost%2Fa%2Fb",
+        "ots-security://scan?url=https%3A%2F%2Fgithub.com%3A444%2Fa%2Fb",
+        "ots-security://scan?url=https%3A%2F%2Fgithub.com%2Fa%2Fb&extra=1",
+    };
+    foreach (var sample in blocked)
+        Assert(!TrustedProtocol.TryParse(sample, out _), "Accepted unsafe protocol: " + sample);
     return Task.CompletedTask;
 }
 

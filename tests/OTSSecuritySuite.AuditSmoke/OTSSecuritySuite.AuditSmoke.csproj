@@ -10,6 +10,7 @@
   <ItemGroup>
     <!-- Exercise the exact production runner without starting WPF or bringing in a test framework. -->
     <Compile Include="../../src/OTSSecuritySuite.Desktop/WhiteAuditRunner.cs" Link="WhiteAuditRunner.cs" />
+    <Compile Include="../../src/OTSSecuritySuite.Desktop/ProtocolActivation.cs" Link="ProtocolActivation.cs" />
     <Compile Include="../../src/OTSSecuritySuite.Desktop/WhiteReportWriter.cs" Link="WhiteReportWriter.cs" />
     <Compile Include="../../src/OTSSecuritySuite.Desktop/QuarantineVaultRegistry.cs" Link="QuarantineVaultRegistry.cs" />
     <ProjectReference Include="../../modules/OTS_System_Sanitizer/src/OTSSystemSanitizer.Core/OTSSystemSanitizer.Core.csproj" />

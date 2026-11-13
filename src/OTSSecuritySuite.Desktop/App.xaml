@@ -1,4 +1,4 @@
-<Application x:Class="OTSSecuritySuite.Desktop.App" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" StartupUri="MainWindow.xaml">
+<Application x:Class="OTSSecuritySuite.Desktop.App" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <Application.Resources>
     <SolidColorBrush x:Key="Neon" Color="#39FF14" />
     <SolidColorBrush x:Key="Background" Color="#080D09" />

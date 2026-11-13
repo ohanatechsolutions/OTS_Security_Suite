@@ -25,22 +25,10 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        // Custom protocol launches from the browser extension only provide a public URL.
-        // Never run arbitrary command-line arguments from a protocol handler.
+        // Startup and later browser protocol messages share one strict parser.
         foreach (var arg in Environment.GetCommandLineArgs().Skip(1))
-        {
-            if (!arg.StartsWith("ots-security://scan?", StringComparison.OrdinalIgnoreCase)) continue;
-            if (!Uri.TryCreate(arg, UriKind.Absolute, out var parsed)) continue;
-            foreach (var part in parsed.Query.TrimStart('?').Split('&'))
-            {
-                var kv = part.Split('=', 2);
-                if (kv.Length != 2 || kv[0] != "url") continue;
-                var candidate = Uri.UnescapeDataString(kv[1]);
-                if (Uri.TryCreate(candidate, UriKind.Absolute, out var repo) &&
-                    repo.Scheme == "https" && (repo.Host == "github.com" || repo.Host == "bitbucket.org"))
-                    _launchRepository = candidate;
-            }
-        }
+            if (TrustedProtocol.TryParse(arg, out var repo) && repo is not null)
+                _launchRepository = repo;
         RefreshVault();
     }
 
@@ -48,6 +36,36 @@ public partial class MainWindow : Window
     {
         FitInitialWindowToWorkArea();
         await StartRepositoryEngineAsync();
+    }
+
+    public void ReceiveProtocol(string uri)
+    {
+        if (_isClosing || !TrustedProtocol.TryParse(uri, out var repo)) return;
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Show();
+        Activate();
+        if (repo is null) return;
+        _launchRepository = repo;
+        SetPanel(RepositoryPanel);
+        if (RepositoryBrowser.CoreWebView2 is not null &&
+            RepositoryBrowser.Visibility == Visibility.Visible)
+            _ = LaunchRequestedRepositoryAsync();
+    }
+
+    private async Task LaunchRequestedRepositoryAsync()
+    {
+        if (_isClosing || _launchRepository is not { Length: > 0 } repo ||
+            RepositoryBrowser.CoreWebView2 is null) return;
+        _launchRepository = null;
+        // The destination is a validated public root URL; the Go scanner still
+        // independently revalidates before accessing the network.
+        var json = System.Text.Json.JsonSerializer.Serialize(repo);
+        var script = "(()=>{const el=document.getElementById('repoUrl');" +
+            "if(!el)return;document.querySelector('.navitem[data-tab=\"scan\"]')?.click();" +
+            "document.querySelector('.scan-mode[data-mode=\"repo\"]')?.click();" +
+            "el.value=" + json + ";document.getElementById('scanRepo')?.click();})();";
+        try { await RepositoryBrowser.ExecuteScriptAsync(script); }
+        catch (Exception ex) { if (!_isClosing) RepositoryLoading.Text = "Could not start requested repository scan: " + ex.Message; }
     }
 
     private void FitInitialWindowToWorkArea()
@@ -77,7 +95,7 @@ public partial class MainWindow : Window
         try
         {
             var psi = new ProcessStartInfo(exe) {
-                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true,
+                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = false,
                 CreateNoWindow = true, WorkingDirectory = _engineDirectory
             };
             psi.ArgumentList.Add("--no-browser");
@@ -87,6 +105,7 @@ public partial class MainWindow : Window
             // The first line contains the one-time local session URL; never print it in diagnostics.
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(25));
             var line = await _engine.StandardOutput.ReadLineAsync(timeout.Token);
+            if (_isClosing) { StopEngine(); return; }
             if (line is null || !line.StartsWith("OTS_SCAN_URL=", StringComparison.Ordinal))
                 throw new InvalidOperationException("Engine did not provide a local session URL.");
             var target = line["OTS_SCAN_URL=".Length..];
@@ -96,7 +115,9 @@ public partial class MainWindow : Window
                 "Ohana Tech Solutions", "Security Suite", "WebView2");
             Directory.CreateDirectory(profile);
             var env = await CoreWebView2Environment.CreateAsync(null, profile);
+            if (_isClosing) { StopEngine(); return; }
             await RepositoryBrowser.EnsureCoreWebView2Async(env);
+            if (_isClosing) { StopEngine(); return; }
             RepositoryBrowser.CoreWebView2.Settings.AreDevToolsEnabled = false;
             RepositoryBrowser.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
             RepositoryBrowser.CoreWebView2.Settings.IsWebMessageEnabled = false;
@@ -115,18 +136,11 @@ public partial class MainWindow : Window
             };
             RepositoryBrowser.Visibility = Visibility.Visible;
             RepositoryLoading.Visibility = Visibility.Collapsed;
+            RepositoryBrowser.CoreWebView2.NavigationCompleted += (_, e) => {
+                if (e.IsSuccess && !_isClosing)
+                    _ = LaunchRequestedRepositoryAsync();
+            };
             RepositoryBrowser.CoreWebView2.Navigate(target);
-            if (_launchRepository is { Length: > 0 })
-            {
-                // The scanner's own query handling is used; the external repo is never executed.
-                RepositoryBrowser.NavigationCompleted += (_, _) => {
-                    if (_launchRepository is null) return;
-                    var repo = _launchRepository;
-                    _launchRepository = null;
-                    _ = RepositoryBrowser.ExecuteScriptAsync("document.getElementById('repoUrl').value = " +
-                        System.Text.Json.JsonSerializer.Serialize(repo) + ";");
-                };
-            }
         }
         catch (Exception ex)
         {

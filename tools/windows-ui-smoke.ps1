@@ -69,6 +69,21 @@ try {
     $cancel = Get-Ui 'WhiteCancel'
     if ($cancel.Current.IsEnabled) { throw 'Cancel Audit remained enabled after completed run' }
     Write-Host 'PASS WPF UI Automation: navigation, text input, real packaged WHITE execution and JSON presentation'
+    # A second native launch must hand off to the first and exit cleanly;
+    # running a separate instance would create a second Go scanner.
+    $exe = (Get-CimInstance Win32_Process -Filter "ProcessId=$($root.Current.ProcessId)").ExecutablePath
+    if (-not $exe) { throw 'Cannot resolve installed suite executable for single-instance smoke' }
+    $secondary = Start-Process -FilePath $exe -ArgumentList 'ots-security://scan' -PassThru
+    try {
+        if (-not $secondary.WaitForExit(15000)) { throw 'Secondary suite instance did not exit' }
+        if ($secondary.ExitCode -ne 0) { throw "Secondary protocol activation failed with exit $($secondary.ExitCode)" }
+        Write-Host 'PASS WPF UI Automation: second invocation handed off without second window'
+    }
+    finally {
+        $secondary.Refresh()
+        if (-not $secondary.HasExited) { Stop-Process -Id $secondary.Id -Force }
+        $secondary.Dispose()
+    }
     Click-Ui 'SystemTab'
     $system = Get-Ui 'SystemStatus'
     if ($system.Current.Name -notlike '*read-only*') {
