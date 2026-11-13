@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using OTSSecuritySuite.Desktop;
+using OTSSystemSanitizer.Core;
 
 var cases = new (string Name, Func<Task> Action)[]
 {
@@ -21,6 +22,9 @@ var cases = new (string Name, Func<Task> Action)[]
     ("quarantine review authorization binds exact vault and hash", QuarantineReviewIdentity),
     ("only one suite per user session owns the activation pipe", SingleInstanceForwarding),
     ("native protocol rejects unsafe repository URL arguments", ProtocolRejectsUnsafeUrls),
+    ("cleanup deletes only selected old temporary fixture", CleanupOnlySelected),
+    ("cleanup refuses modified or recent synthetic fixtures", CleanupRejectsChangedAndRecent),
+    ("cleanup rejects non-allowlisted locations and cache opt-in spoof", CleanupRejectsOutsideRoots),
 };
 int passed = 0;
 foreach (var (name, action) in cases)
@@ -327,6 +331,71 @@ static Task ProtocolRejectsUnsafeUrls()
     };
     foreach (var sample in blocked)
         Assert(!TrustedProtocol.TryParse(sample, out _), "Accepted unsafe protocol: " + sample);
+    return Task.CompletedTask;
+}
+
+static Task CleanupOnlySelected()
+{
+    var root=Path.Combine(Path.GetTempPath(),"OTS-Cleanup-QA-"+Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    try {
+        var a=Path.Combine(root,"chosen.tmp"); var b=Path.Combine(root,"not-chosen.tmp");
+        File.WriteAllText(a,"SYNTHETIC"); File.WriteAllText(b,"SYNTHETIC OTHER");
+        File.SetLastWriteTimeUtc(a,DateTime.UtcNow.AddDays(-10));
+        File.SetLastWriteTimeUtc(b,DateTime.UtcNow.AddDays(-10));
+        var f=new FileInfo(a);
+        var result=CleanupService.RemoveSelected(new [] {
+            new CleanupCandidate(a,CleanupService.UserTemp,f.Length,f.LastWriteTimeUtc,false)
+        });
+        Assert(result.Removed==1 && result.Failures.Count==0,"Selected fixture not removed");
+        Assert(!File.Exists(a) && File.Exists(b),"Cleanup removed unselected fixture");
+    } finally { Directory.Delete(root,true); }
+    return Task.CompletedTask;
+}
+
+static Task CleanupRejectsChangedAndRecent()
+{
+    var root=Path.Combine(Path.GetTempPath(),"OTS-Cleanup-QA-"+Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    try {
+        var path=Path.Combine(root,"changed.tmp");
+        File.WriteAllText(path,"OLD");
+        File.SetLastWriteTimeUtc(path,DateTime.UtcNow.AddDays(-10));
+        var info=new FileInfo(path);
+        var chosen=new CleanupCandidate(path,CleanupService.UserTemp,info.Length,info.LastWriteTimeUtc,false);
+        File.AppendAllText(path,"CHANGED SINCE REVIEW");
+        var changed=CleanupService.RemoveSelected(new [] {chosen});
+        Assert(changed.Removed==0 && changed.Failures.Count==1 && File.Exists(path),
+            "Changed fixture was deleted despite denied review");
+        var recent=Path.Combine(root,"recent.tmp");
+        File.WriteAllText(recent,"RECENT");
+        var fresh=new FileInfo(recent);
+        var denied=CleanupService.RemoveSelected(new [] {
+            new CleanupCandidate(recent,CleanupService.UserTemp,fresh.Length,fresh.LastWriteTimeUtc,false)
+        });
+        Assert(denied.Removed==0 && denied.Failures.Count==1 && File.Exists(recent),
+            "Recently modified fixture was deleted");
+    } finally { Directory.Delete(root,true); }
+    return Task.CompletedTask;
+}
+
+static Task CleanupRejectsOutsideRoots()
+{
+    var root=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "OTS-Cleanup-QA-"+Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    try {
+        var path=Path.Combine(root,"outside.tmp");
+        File.WriteAllText(path,"SYNTHETIC PRIVATE LOCATION");
+        File.SetLastWriteTimeUtc(path,DateTime.UtcNow.AddDays(-10));
+        var info=new FileInfo(path);
+        var result=CleanupService.RemoveSelected(new [] {
+            new CleanupCandidate(path,CleanupService.UserTemp,info.Length,info.LastWriteTimeUtc,false),
+            new CleanupCandidate(path,CleanupService.BrowserCache,info.Length,info.LastWriteTimeUtc,true),
+        });
+        Assert(result.Removed==0 && result.Failures.Count==2 && File.Exists(path),
+            "Unapproved location was deleted");
+    } finally { Directory.Delete(root,true); }
     return Task.CompletedTask;
 }
 
