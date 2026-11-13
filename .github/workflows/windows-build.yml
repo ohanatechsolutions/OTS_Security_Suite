@@ -49,6 +49,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Suite Python manifest tests failed' }
           node --check extension/popup.js
           if ($LASTEXITCODE -ne 0) { throw 'Chrome extension JS syntax check failed' }
+          node tools/test_extension.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Chrome popup security contract tests failed' }
+          foreach ($p in @('tools/sign-windows-release.ps1','tools/verify-windows-release.ps1')) {
+            $tokens = $null; $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p).Path,[ref]$tokens,[ref]$parseErrors) | Out-Null
+            if ($parseErrors.Count -ne 0) { throw "Release-script parse failed: $p" }
+          }
           # Verify the supplied brand PNG genuinely has transparent pixels.
           # Metadata/filename alone cannot prove the black background was removed.
           Add-Type -AssemblyName System.Drawing
@@ -199,6 +206,9 @@ jobs:
           $vaultCanary = Join-Path $vaultRoot ("ots-ci-preserve-" + [Guid]::NewGuid().ToString('N') + '.txt')
           [System.IO.File]::WriteAllText($vaultCanary, 'synthetic-quarantine-preservation-check')
           $installer = (Resolve-Path 'artifacts/OTS-Security-Suite-Setup-x64.exe').Path
+          $expected = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash
+          & pwsh -NoProfile -File tools/verify-windows-release.ps1 -InstallerPath $installer -ExpectedSha256 $expected
+          if ($LASTEXITCODE -ne 0) { throw 'Installer validation failed' }
           $stream = [System.IO.File]::OpenRead($installer)
           try {
             if ($stream.ReadByte() -ne 77 -or $stream.ReadByte() -ne 90) {
@@ -251,6 +261,14 @@ jobs:
           if (-not ($protocolKey.GetValue('') -like '*OTSSecuritySuite.exe*')) {
             throw 'Installed custom URL protocol command is missing or incorrect'
           }
+          # Safe same-version repair: reinstall over the existing closed app.
+          $repair = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-') -Wait -PassThru
+          if ($repair.ExitCode -ne 0 -or -not (Test-Path $desktopExe)) { throw 'Same-version reinstall failed' }
+          if (-not (Test-Path $vaultCanary) -or
+              ([System.IO.File]::ReadAllText($vaultCanary) -ne 'synthetic-quarantine-preservation-check')) {
+            throw 'Same-version repair damaged user quarantine data'
+          }
+          Write-Host 'Same-version silent repair and quarantine retention verified'
           $uninstall = Join-Path $installPath 'unins000.exe'
           if (-not (Test-Path $uninstall)) { throw 'Inno uninstaller is missing' }
           $remove = Start-Process -FilePath $uninstall -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
