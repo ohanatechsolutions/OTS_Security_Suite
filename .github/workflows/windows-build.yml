@@ -111,6 +111,12 @@ jobs:
           $categories = @($report.findings | Group-Object -Property severity |
             ForEach-Object { "$($_.Name):$($_.Count)" })
           Write-Host "Offline WHITE source audit complete: $($report.scanned_files) files; severity counts: $($categories -join ', ')"
+          # Metadata-only triage; do not output matched text, secrets or raw reports.
+          foreach ($finding in @($report.findings | Where-Object { $_.severity -in @('critical','high') })) {
+            $safeRule = ([string]$finding.rule_id) -replace '[^a-zA-Z0-9_-]', '_'
+            $safePath = ([string]$finding.path) -replace '[\r\n\x00-\x1f]', '_'
+            Write-Host "WHITE TRIAGE metadata-only: $safeRule at ${safePath}:$($finding.line)"
+          }
           # This test covers worktree secrets/SAST only; not history, offline OSV,
           # external penetration testing or binary payload correctness.
           $global:LASTEXITCODE = 0
