@@ -29,10 +29,13 @@ try {
     if(-not $installerVersion){throw 'PyInstaller packaging version not discoverable.'}
     $innoCompiler=Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
     if(-not [IO.File]::Exists($innoCompiler)){throw 'Inno Setup 6 compiler is unavailable.'}
-    $innoVersion=([IO.FileInfo]$innoCompiler).VersionInfo.FileVersion
-    if(-not $innoVersion -or $innoVersion -notmatch '^6\.'){
-        throw 'Inno Setup 6 compiler version could not be verified.'
-    }
+    $innoInfo=Get-Item -LiteralPath $innoCompiler -ErrorAction Stop
+    $innoVersion=@($innoInfo.VersionInfo.FileVersion,$innoInfo.VersionInfo.ProductVersion) |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        Select-Object -First 1
+    if(-not $innoVersion){$innoVersion='not-present-in-PE-version-resource'}
+    $innoSha256=(Get-FileHash -LiteralPath $innoCompiler -Algorithm SHA256).Hash
+    if($innoSha256 -notmatch '^[A-Fa-f0-9]{64}$'){throw 'Inno compiler binary checksum invalid.'}
 
     $components=@(
         [ordered]@{ name='OTSSecuritySuite.Desktop'; type='WPF app'; version=$suiteVersion;
@@ -46,7 +49,7 @@ try {
         [ordered]@{ name='OTS System Sanitizer'; type='.NET submodule'; commit=$sanitizer;
             source='modules/OTS_System_Sanitizer' },
         [ordered]@{ name='PyInstaller'; type='build-only packaging'; version=$installerVersion },
-        [ordered]@{ name='Inno Setup'; type='build-only Windows compiler'; version=$innoVersion }
+        [ordered]@{ name='Inno Setup'; type='build-only Windows compiler'; version=$innoVersion; binary_sha256=$innoSha256 }
     )
 
     $manifest=[ordered]@{
@@ -61,7 +64,7 @@ try {
         product=[ordered]@{name='OTS Security Suite'; version=$suiteVersion;
             target='win-x64'; stage='unsigned integration preview'}
         toolchains=[ordered]@{go=$go; dotnet_sdk=$net; python=$python;
-            pyinstaller=$installerVersion; inno_setup=$innoVersion}
+            pyinstaller=$installerVersion; inno_setup=$innoVersion; inno_setup_sha256=$innoSha256}
         direct_components=$components
         evidence_scope='Direct components and build tools only; NOT a full transitive SBOM or vulnerability certification.'
         separate_dependencies=@('Microsoft Edge WebView2 Runtime on target Windows machine',
