@@ -2,6 +2,27 @@
 const $=id=>document.getElementById(id);
 let currentReport=null, currentMode='repo', activeScan=null;
 const categories=['Code execution','Data exfiltration','Credential theft','Obfuscation','Supply chain','Persistence','Web vulnerabilities','Host control','Embedded payload','File integrity','Document threats','Test signatures'];
+// The placeholder allows pasting github.com/... directly. Canonicalize only
+// public HTTPS root repository URLs; the Go backend rechecks the same boundary.
+function normalizeRepositoryInput(input){
+ const raw=String(input??'').trim();
+ if(!raw)return '';
+ const full=/^(github\.com|www\.github\.com|bitbucket\.org)\//i.test(raw)
+   ? 'https://'+raw : raw;
+ try{
+  const uri=new URL(full);
+  const host=uri.hostname.toLowerCase()==='www.github.com'
+    ? 'github.com' : uri.hostname.toLowerCase();
+  if(uri.protocol!=='https:' || !['github.com','bitbucket.org'].includes(host) ||
+     uri.username || uri.password || uri.port || uri.search || uri.hash)return '';
+  const parts=uri.pathname.split('/').filter(Boolean);
+  if(parts.length!==2 || !parts.every(x=>/^[a-z0-9_.-]{1,100}$/i.test(x) &&
+      x!=='.' && x!=='..' && !x.includes('..')))return '';
+  const repo=parts[1].replace(/\.git$/i,'');
+  if(!repo || !/^[a-z0-9_.-]{1,100}$/i.test(repo))return '';
+  return 'https://'+host+'/'+parts[0]+'/'+repo;
+ }catch{return ''}
+}
 const escapeHTML=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const show=(id,yes=true)=>$(id).classList.toggle('hidden',!yes);
 const active=(cls,node)=>{document.querySelectorAll('.'+cls).forEach(x=>x.classList.toggle('active',x===node));};
@@ -20,8 +41,13 @@ async function scan(mode){
  try{
   let report;
   if(mode==='repo'||mode==='folder'){
-    let body=mode==='repo'?{url:$('repoUrl').value.trim()}:{folder:$('folderPath').value.trim()};
-    if(!Object.values(body)[0])throw new Error('Please enter a repository URL or folder path.');
+    const input=mode==='repo' ? $('repoUrl').value.trim() : $('folderPath').value.trim();
+    const canonical=mode==='repo' ? normalizeRepositoryInput(input) : input;
+    if(!canonical)throw new Error(mode==='repo'
+      ? 'Enter a public root GitHub or Bitbucket repository URL (HTTPS only).'
+      : 'Please enter a local file or folder path.');
+    if(mode==='repo')$('repoUrl').value=canonical;
+    const body=mode==='repo'?{url:canonical}:{folder:canonical};
     report=await api('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller.signal});
   }else{
     const files=Array.from((mode==='file'?$('fileUpload'):$('folderUpload')).files);if(!files.length)throw new Error('Choose files or a folder first.');

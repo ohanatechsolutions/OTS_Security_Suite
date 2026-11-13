@@ -52,6 +52,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Chrome extension JS syntax check failed' }
           node tools/test_extension.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Chrome popup security contract tests failed' }
+          node tools/test_scanner_browser.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Embedded RepoScan browser normalization contract failed' }
           foreach ($p in @('tools/sign-windows-release.ps1','tools/verify-windows-release.ps1','tools/collect-windows-qa.ps1','tools/generate-build-manifest.ps1')) {
             $tokens = $null; $parseErrors = $null
             [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p).Path,[ref]$tokens,[ref]$parseErrors) | Out-Null
