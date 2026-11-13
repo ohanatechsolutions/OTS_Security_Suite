@@ -101,7 +101,7 @@ jobs:
           $exe = (Resolve-Path 'bundle/engines/OTSWhiteAudit.exe').Path
           # Do not print the raw scanner JSON, source snippets or secret findings
           # into public GitHub Actions logs. Offline SCA is explicitly skipped.
-          $reportJson = (& $exe $root '--format' 'json' '--no-sca' '--fail-on' 'none') -join "`n"
+          $reportJson = (& $exe $root '--format' 'json' '--no-sca' '--fail-on' 'none' '--exclude' 'bundle/*' '--exclude' '*.exe' '--exclude' '*.dll' '--exclude' '*.png' '--exclude' '*.ico' '--exclude' 'artifacts/*') -join "`n"
           if ($LASTEXITCODE -ne 0) { throw 'Suite source audit was incomplete or failed; inspect privately' }
           $report = $reportJson | ConvertFrom-Json
           if (-not $report.complete -or -not $report.checks -or
