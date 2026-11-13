@@ -28,7 +28,41 @@ var assets embed.FS
 
 const Addr = "127.0.0.1:48728"
 
-var idPattern = regexp.MustCompile(`^\d{10,24}$`)
+var idPattern = regexp.MustCompile(`^\d{10,24}package desktop
+
+import (
+	"context"
+	"errors"
+	"crypto/rand"
+	"crypto/subtle"
+	"embed"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
+	"ots/github-malware-scanner/internal/engine"
+)
+
+//go:embed assets/*
+var assets embed.FS
+
+const Addr = "127.0.0.1:48728"
+
+)
+
+// History is local user-controlled data; never trust an on-disk JSON file's
+// basename, claimed ID, type, or byte count without revalidation.
+const maxStoredReportBytes int64 = 32 << 20
 
 type Server struct {
 	secret        string
@@ -334,6 +368,35 @@ func (s *Server) scanUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, report)
 }
+func (s *Server) readStoredReport(id string) ([]byte, *engine.Report, error) {
+	if !idPattern.MatchString(id) {
+		return nil, nil, errors.New("invalid report identifier")
+	}
+	filename := filepath.Join(s.reportsDir, id+".json")
+	info, err := os.Lstat(filename)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > maxStoredReportBytes {
+		return nil, nil, errors.New("invalid report file type or size")
+	}
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer file.Close()
+	data, err := io.ReadAll(io.LimitReader(file, maxStoredReportBytes+1))
+	if err != nil || int64(len(data)) > maxStoredReportBytes {
+		return nil, nil, errors.New("report exceeds storage read limit")
+	}
+	var parsed engine.Report
+	if json.Unmarshal(data, &parsed) != nil || parsed.ID != id ||
+		parsed.ID == "" || parsed.RulesAvailable < 0 {
+		return nil, nil, errors.New("local report metadata does not match filename")
+	}
+	return data, &parsed, nil
+}
+
 func (s *Server) history(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "GET required", 405)
@@ -362,14 +425,8 @@ func (s *Server) history(w http.ResponseWriter, r *http.Request) {
 		if !idPattern.MatchString(id) {
 			continue
 		}
-		b, err := os.ReadFile(filepath.Join(s.reportsDir, e.Name()))
-		if err != nil {
-			continue
-		}
-		var item engine.Report
-		if json.Unmarshal(b, &item) != nil {
-			continue
-		}
+		_, item, err := s.readStoredReport(id)
+		if err != nil { continue }
 		out = append(out, summary{item.ID, item.Target, item.Date, item.Score, item.Verdict, len(item.Findings)})
 	}
 	writeJSON(w, out)
@@ -384,12 +441,13 @@ func (s *Server) report(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid report ID", 400)
 		return
 	}
-	b, err := os.ReadFile(filepath.Join(s.reportsDir, id+".json"))
+	b, _, err := s.readStoredReport(id)
 	if err != nil {
-		http.Error(w, "not found", 404)
+		http.Error(w, "report missing or invalid", 404)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
 	if r.URL.Query().Get("download") == "1" {
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=OTS-Scan-%s.json", id))
 	}

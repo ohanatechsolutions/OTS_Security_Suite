@@ -144,3 +144,44 @@ func TestSavedReportAtomicAndRejectsUnsafeIdentifiers(t *testing.T) {
 	files, err = os.ReadDir(s.reportsDir)
 	if err != nil || len(files) != 1 { t.Fatalf("failed save modified history: %v %v", files, err) }
 }
+
+func TestHistorySkipsForgedOrOversizedLocalReports(t *testing.T) {
+	s := newSecurityFixture(t)
+	good := engine.NewReport("safe synthetic", "local test")
+	if err := s.save(good); err != nil { t.Fatal(err) }
+	forgedID := "1712345678900000001"
+	bad, err := engine.ReportJSON(good)
+	if err != nil { t.Fatal(err) }
+	if err := os.WriteFile(filepath.Join(s.reportsDir, forgedID+".json"), bad, 0600); err != nil { t.Fatal(err) }
+	oversizedID := "1712345678900000002"
+	large, err := os.Create(filepath.Join(s.reportsDir, oversizedID+".json"))
+	if err != nil { t.Fatal(err) }
+	if err := large.Truncate(maxStoredReportBytes+1); err != nil { large.Close(); t.Fatal(err) }
+	large.Close()
+	malformedID := "1712345678900000003"
+	if err := os.WriteFile(filepath.Join(s.reportsDir, malformedID+".json"), []byte("{"), 0600); err != nil { t.Fatal(err) }
+
+	request := requestWithCookie("GET","http://127.0.0.1:54321/api/history","",s.secret,"")
+	result := httptest.NewRecorder()
+	s.withAuth(s.history)(result,request)
+	if result.Code != 200 { t.Fatalf("history returned %d",result.Code) }
+	var rows []struct{ ID string `json:"id"` }
+	if err := json.Unmarshal(result.Body.Bytes(), &rows); err != nil { t.Fatal(err) }
+	if len(rows) != 1 || rows[0].ID != good.ID {
+		t.Fatalf("history should hide forged, malformed and oversize files: %+v",rows)
+	}
+	for _, id := range []string{forgedID,oversizedID,malformedID} {
+		rec := httptest.NewRecorder()
+		req := requestWithCookie("GET","http://127.0.0.1:54321/api/report/"+id,"",s.secret,"")
+		s.withAuth(s.report)(rec,req)
+		if rec.Code != 404 {
+			t.Fatalf("invalid report %s was downloadable: HTTP %d",id,rec.Code)
+		}
+	}
+	rec := httptest.NewRecorder()
+	req := requestWithCookie("GET","http://127.0.0.1:54321/api/report/"+good.ID,"",s.secret,"")
+	s.withAuth(s.report)(rec,req)
+	if rec.Code != 200 || rec.Header().Get("Cache-Control") != "no-store" {
+		t.Fatal("valid report not served privately and without caching")
+	}
+}
