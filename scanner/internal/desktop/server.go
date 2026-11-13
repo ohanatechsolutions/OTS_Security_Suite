@@ -28,7 +28,7 @@ var assets embed.FS
 
 const Addr = "127.0.0.1:48728"
 
-var idPattern = regexp.MustCompile(`^\\d{10,24}$`)
+var idPattern = regexp.MustCompile(`^\d{10,24}$`)
 
 // History is local user-controlled data; never trust an on-disk JSON file's
 // basename, claimed ID, type, or byte count without revalidation.
