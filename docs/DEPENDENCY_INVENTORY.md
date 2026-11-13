@@ -5,11 +5,11 @@
 | Component | Runtime/build role | Source of truth | Version or status |
 |---|---|---|---|
 | .NET / WPF desktop | Windows app/runtime | `src/OTSSecuritySuite.Desktop/*.csproj`, Windows CI | .NET 10, self-contained Win-x64 publish |
-| Microsoft WebView2 | Embedded scanner UI integration | Desktop csproj | NuGet `Microsoft.Web.WebView2` **1.0.3537.50**; separate Evergreen Runtime installed on target |
+| Microsoft WebView2 | Embedded scanner UI integration | Desktop csproj | NuGet `Microsoft.Web.WebView2` **1.0.4314.35**; separate Evergreen Runtime installed on target |
 | RepoScan | No-execute local and public snapshot scanner | `scanner/go.mod` and Go source | Go **1.27.4**, no additional module requirements in go.mod; engine reports v2.5.0 |
 | OTS W.H.I.T.E. | Secrets/SAST/history/offline SCA engine | Pinned `modules/OTS_WHITE` gitlink | Commit pinned in manifest, Python 3.12 build; intentionally offline |
 | OTS System Sanitizer | Windows inspections and DPAPI/AES quarantine | Pinned `modules/OTS_System_Sanitizer` gitlink | Commit pinned in manifest, .NET 10 Core, no external NuGet requirement in core csproj |
-| PyInstaller | Build-only Python CLI packager | `.github/workflows/windows-build.yml` | Pinned **6.16.0**; transitive build dependencies not yet recorded as a complete lockfile |
+| PyInstaller | Build-only Python CLI packager | `.github/workflows/windows-build.yml` | Pinned **6.22.3**; transitive build dependencies not yet recorded as a complete lockfile |
 | Inno Setup | Per-user Windows installer creator | `installer/OTS-Security-Suite.iss` and preinstalled Windows runner | Inno Setup 6 family, exact runner image minor version not pinned |
 | Chrome MV3 companion | User-invoked repository URL handoff | `extension/manifest.json` | Native JS, `activeTab` only, no npm runtime dependency |
 | OSV-Scanner offline cache | Optional local dependency vulnerability scanning | W.H.I.T.E. CLI | **Not bundled**; missing offline tool/cache makes enabled SCA incomplete, not clean |
@@ -21,3 +21,5 @@
 **Known supply-chain gaps and release gates:** Transitive PyInstaller/NuGet package-lock with signed integrity checks, exact Inno runner version pin, full runtime SBOM, independent vulnerability/license and Authenticode publisher review. These are `IN PROGRESS` / `BLOCKED`, not N/A. When preparing a signed candidate, regenerate the manifest as part of the authorized build and verify that it represents the actual packaged source and tools; the manifest itself is not an artifact signature.
 
 **Cost/data policy:** No added API calls, paid subscriptions, telemetry or remote dependency-CVE lookup are authorized. The software runs source/security scans locally. Future dependency automation, official signed distribution and data-sharing decisions need an explicit recorded owner release policy.
+
+**Dependency refresh (2026-11-13):** Replaced WebView2 SDK 1.0.3537.50 with Microsoft NuGet stable 1.0.4314.35 (2026-10-23), and build-only PyInstaller 6.16.0 with PyPI 6.22.3 (2026-09-12). These are release maintenance updates, not evidence that earlier versions were exploitable. Keep the separate Evergreen WebView2 runtime up to date on target machines. PyInstaller's PyPI release does not include uploaded provenance attestations; independent package trust and complete transitive SBOM remain release review items.

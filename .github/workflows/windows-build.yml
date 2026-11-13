@@ -86,7 +86,7 @@ jobs:
       - name: Build W.H.I.T.E. as offline CLI
         shell: pwsh
         run: |
-          python -m pip install --disable-pip-version-check -e modules/OTS_WHITE pyinstaller==6.16.0
+          python -m pip install --disable-pip-version-check -e modules/OTS_WHITE pyinstaller==6.22.3
           python -m PyInstaller --noconfirm --clean --onefile --console --name OTSWhiteAudit --paths modules/OTS_WHITE tools/white_entry.py
           if ($LASTEXITCODE -ne 0) { throw 'W.H.I.T.E. build failed' }
           Copy-Item dist/OTSWhiteAudit.exe bundle/engines/
