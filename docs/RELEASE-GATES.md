@@ -1,13 +1,29 @@
 # OTS Security Suite — public release gates
 
-Current status: **INTEGRATION PREVIEW, NOT SHIP-READY**.
+Current status: **INTEGRATION PREVIEW — LATEST WINDOWS CI PASS; INDEPENDENT QA AND SIGNED PUBLIC RELEASE NO-GO**.
+
+## Verified latest engineering candidate — 2026-11-13
+
+**Last verified engineering-code commit:** `ba7562b41e7ec1abda69406fc0b1a235993e3df7` — [Windows CI #43414634076](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43414634076) **SUCCESS**, Windows runner. Actual logs: Go tests/vet and scanner build PASS; Chrome popup contracts **13/13 PASS**; embedded RepoScan URL normalization **17/17 PASS**; offline W.H.I.T.E. source/history audit **172 worktree files scanned, zero high/critical findings reported by the configured audit** (not an independent security certification); packaged WHITE checks PASS; 22/22 Windows C# process/report/quarantine tests PASS; Sanitizer tests PASS; native WPF publish PASS; Inno Setup package PASS; install/WPF UI Automation/second-launch handoff/normal close/repair/uninstall and synthetic user-vault retention PASS; source/submodule/compiler provenance manifest PASS. **Unsigned CI test installer SHA-256: `826DD311F59CAD0E4BEB7A2F1353921CD5C790D90577D73B5C99C40FF4C830AA`**. Artifact upload intentionally skipped on PR, no public signed release. Independent real-device QA, historical DPAPI recovery, Chrome clean-profile, publisher signing and final owner approval remain **NOT RUN/BLOCKED**.
+
+**Current branch release state:** DRAFT PR #2, main untouched, public release **NO-GO**. Earlier test runs and SHA-256 values below are historical evidence for different commits; they are not interchangeable with this binary. A future manually dispatched Actions test artifact will have its own hash and must be verified against its own SHA256SUMS.
+
+**2026-11-11 (HST) governance:** Baseline main `d45de9592345` has successful GitHub Windows CI [run #7](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43132451936). This is **not** evidence that the M1 feature branch is buildable or user-installable. Current source/requirements, actual checks, and open decisions are recorded in [BUILD_BLUEPRINT](BUILD_BLUEPRINT.md), [PROJECT_STATUS](PROJECT_STATUS.md), and [TEST_EVIDENCE](TEST_EVIDENCE.md).
+
+**Current candidate evidence:** [Windows CI run 43172812782](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43172812782) PASS at `59243e6b15c6` with 8/8 audit-process tests, real WPF launch/close, bundled scanner/WHITE/Sanitizer checks, Inno EXE PE header, SHA-256, protocol registration and uninstall. Installer was not uploaded on the PR. See [TEST_EVIDENCE](TEST_EVIDENCE.md) E-013–E-021.  
+**CI installer hash:** `389DBCFE20AE5CB29EAA4F17B5360DEF0DD14841FA4DE7F767301289AFABF092`.
+
+**Current actual Windows CI evidence:** [run 43189027296](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43189027296) **SUCCESS** for docs head `de277e5fa3bb2d7e1bd8b2aac362a3d9e74ff916` containing executable source `a2f39b812e61116ecaa3f4813909b662d4149224`, with `Audit runner tests: 15/15 PASS`, packaged WHITE success/incomplete contract, 95 scanner rules and Go tests/vet, WPF synthetic navigation and real CLI execution, logo PNG sampled transparency (1563×1563), Inno installer, bundled MIT/license notices, extension files, synthetic vault preservation, URI registration, normal close and uninstall. Installer SHA-256 `8872BB5E2039C7B5F6AA13EA7AC52276CB22C80AA88B00FCDEE6271B5BC1C929` (CI-created, deliberately not uploaded on draft PR). **Automated gates passed; human Win10/Win11, clean Chrome extension, legacy real-user vault, independent security and publisher signing remain NOT RUN / blocked.**
+
+**Formal release decision: NO-GO.** No owner/publication approval, verified Windows end-to-end integration acceptance, or independently verified publisher signature. Preserve original apps and quarantine; never publish an unsigned beta as a signed public release.
 
 - [x] Review W.H.I.T.E. and System Sanitizer source boundaries
 - [x] Preserve the Go scanner engine and 95-rule table (avoid regression from rewrite)
 - [x] Native WPF host project and user-supplied Windows .ico and header PNG
 - [x] Ephemeral local port and host-managed child engine lifecycle
 - [x] Local Go tests, Go vet, extension JS syntax, project manifest/XAML parse tests
-- [ ] GitHub Windows build green with all Git submodules initialized
+- [x] Baseline main `d45de959` GitHub Windows build green with submodules initialized — CI #7 only; see evidence E-002
+- [x] Current review candidate `59243e6b` Windows CI build & integration checks PASS — run 43172812782, E-013–E-021 (no public artifact)
 - [ ] Confirm WebView2 and .NET 10 runtime on clean Windows 11 VM
 - [ ] Run an installed app, then close window and verify child engine has exited
 - [ ] Verify tray/taskbar/title-bar/Alt+Tab all use the new .ico; no Chrome app window
@@ -24,3 +40,30 @@ Current status: **INTEGRATION PREVIEW, NOT SHIP-READY**.
 - [ ] Versioned docs, backup instructions, update policy and signed Release checksums
 
 Never turn an incomplete scan into a clean malware verdict. Neither heuristics nor file coverage guarantee a safe repository. Keep quarantine/destruction explicit, reversible where possible, and audited.
+
+
+## Mandatory owner approval and platform verification
+
+- [x] TEST-006 partial: Windows headless audit runner cancellation/timeout/overflow/concurrency 8/8 PASS (E-017); **not** an interactive GUI check
+- [ ] TEST-006/017 remaining: Cancel Audit through the actual WPF UI and close suite mid-audit; observe all descendants
+- [ ] Confirm invalid/empty W.H.I.T.E. JSON cannot be exported, audit stderr is not exposed, and output streams are bounded against hostile input.
+- [ ] Confirm 95-rule/12-category inventory and accurate partial scan semantics (TEST-004/014); do not imply 100% malware detectability.
+- [ ] Confirm local-only HTTP origin, WebView2 pop-up/permission denial, protocol URL allowlist and Chrome clean-profile behavior.
+- [ ] Perform non-admin Windows 10/11 tests for vault/restore and explicit deletion denied states, including old Sanitizer vault.
+- [x] CI-generated Inno installer PE/MZ, SHA256, per-user install, WPF launch/close, URI and uninstall smoke PASS (E-020/E-021)
+- [ ] Independently reproduce on clean Win10 and Win11, verify architecture, upgrade/repair, backup/rollback and artifacts
+- [ ] Approve artifact signing identity (or explicitly accept **private unsigned preview only**) and record product/security/ops human GO before publication.
+- [ ] Keep tested prior build and recovery runbook accessible; perform a rollback trial.
+
+**N/A with rationale:** payments/subscriptions, mobile app stores, SaaS production deployment, AI agent/LLM behavior and firmware: no such product components in Windows V1. The Windows desktop, browser-extension, local-first and security utility addenda remain applicable.
+
+## V1 release-evidence deltas still required
+- [x] Go 1.27.4 builder and scanner cancel/HTTP negative/TAR resource unit/vet tests PASS, [run 43189027296](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43189027296); manual UI Cancel still required.
+- [x] WHITE JSON fail-closed assessment and **15/15** headless Windows runner/report/dual-vault review tests PASS (same run).
+- [x] Installed WPF synthetic UI navigation + packaged WHITE CLI end-to-end automation PASS (same run).
+- [x] PNG logo sampled alpha (1563×1563), WPF source AppUserModelID and native EXE icon/installed shortcut setup checks PASS; human 100/150/200% DPI/taskbar check separate remains OPEN.
+- [x] Dual-vault synthetic DPAPI/AES roundtrip and synthetic vault canary retention during uninstall PASS; real historical profile and recovery QA OPEN.
+- [x] Installed extension and pinned MIT/license/notice files presence PASS; suite source/license distribution decision still OPEN.
+- [ ] Obtain authorized publisher certificate/signing process; do not infer legitimacy from Installed Apps publisher metadata.
+
+**Older CI-generated installer hash, NOT PUBLISHED (historical):** `8872BB5E2039C7B5F6AA13EA7AC52276CB22C80AA88B00FCDEE6271B5BC1C929`, source `a2f39b812e61116ecaa3f4813909b662d4149224`, Windows run [43189027296](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43189027296). The previous CI-generated hash belongs to an older build and must not be used for this candidate.

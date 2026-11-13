@@ -14,7 +14,8 @@ public partial class MainWindow : Window
 {
     private Process? _engine;
     private CancellationTokenSource? _scanCancellation;
-    private readonly QuarantineService _quarantine = new();
+    private readonly WhiteAuditRunner _whiteAuditRunner = new();
+    private readonly QuarantineVaultRegistry _quarantine = new();
     private readonly HashSet<string> _reviewed = new(StringComparer.Ordinal);
     private readonly string _engineDirectory = Path.Combine(AppContext.BaseDirectory, "engines");
     private string? _lastWhiteOutput;
@@ -24,28 +25,63 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        // Custom protocol launches from the browser extension only provide a public URL.
-        // Never run arbitrary command-line arguments from a protocol handler.
+        // Startup and later browser protocol messages share one strict parser.
         foreach (var arg in Environment.GetCommandLineArgs().Skip(1))
-        {
-            if (!arg.StartsWith("ots-security://scan?", StringComparison.OrdinalIgnoreCase)) continue;
-            if (!Uri.TryCreate(arg, UriKind.Absolute, out var parsed)) continue;
-            foreach (var part in parsed.Query.TrimStart('?').Split('&'))
-            {
-                var kv = part.Split('=', 2);
-                if (kv.Length != 2 || kv[0] != "url") continue;
-                var candidate = Uri.UnescapeDataString(kv[1]);
-                if (Uri.TryCreate(candidate, UriKind.Absolute, out var repo) &&
-                    repo.Scheme == "https" && (repo.Host == "github.com" || repo.Host == "bitbucket.org"))
-                    _launchRepository = candidate;
-            }
-        }
+            if (TrustedProtocol.TryParse(arg, out var repo) && repo is not null)
+                _launchRepository = repo;
         RefreshVault();
     }
 
     private async void OnWindowLoaded(object sender, RoutedEventArgs e)
     {
+        FitInitialWindowToWorkArea();
         await StartRepositoryEngineAsync();
+    }
+
+    public void ReceiveProtocol(string uri)
+    {
+        if (_isClosing || !TrustedProtocol.TryParse(uri, out var repo)) return;
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Show();
+        Activate();
+        if (repo is null) return;
+        _launchRepository = repo;
+        SetPanel(RepositoryPanel);
+        if (RepositoryBrowser.CoreWebView2 is not null &&
+            RepositoryBrowser.Visibility == Visibility.Visible)
+            _ = LaunchRequestedRepositoryAsync();
+    }
+
+    private async Task LaunchRequestedRepositoryAsync()
+    {
+        if (_isClosing || _launchRepository is not { Length: > 0 } repo ||
+            RepositoryBrowser.CoreWebView2 is null) return;
+        _launchRepository = null;
+        // The destination is a validated public root URL; the Go scanner still
+        // independently revalidates before accessing the network.
+        var json = System.Text.Json.JsonSerializer.Serialize(repo);
+        var script = "(()=>{const el=document.getElementById('repoUrl');" +
+            "if(!el)return;document.querySelector('.navitem[data-tab=\"scan\"]')?.click();" +
+            "document.querySelector('.scan-mode[data-mode=\"repo\"]')?.click();" +
+            "el.value=" + json + ";document.getElementById('scanRepo')?.click();})();";
+        try { await RepositoryBrowser.ExecuteScriptAsync(script); }
+        catch (Exception ex) { if (!_isClosing) RepositoryLoading.Text = "Could not start requested repository scan: " + ex.Message; }
+    }
+
+    private void FitInitialWindowToWorkArea()
+    {
+        // WorkArea and WPF Window bounds are both in device-independent pixels.
+        // Keep the requested 1300x800 default when space allows, but never force
+        // a window larger than the available desktop on scaled/small displays.
+        var work = SystemParameters.WorkArea;
+        var availableWidth = Math.Max(1, work.Width - 24);
+        var availableHeight = Math.Max(1, work.Height - 24);
+        MinWidth = Math.Min(900, availableWidth);
+        MinHeight = Math.Min(650, availableHeight);
+        Width = Math.Min(1300, availableWidth);
+        Height = Math.Min(800, availableHeight);
+        Left = work.Left + (work.Width - Width) / 2;
+        Top = work.Top + (work.Height - Height) / 2;
     }
 
     private async Task StartRepositoryEngineAsync()
@@ -59,7 +95,7 @@ public partial class MainWindow : Window
         try
         {
             var psi = new ProcessStartInfo(exe) {
-                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true,
+                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = false,
                 CreateNoWindow = true, WorkingDirectory = _engineDirectory
             };
             psi.ArgumentList.Add("--no-browser");
@@ -69,6 +105,7 @@ public partial class MainWindow : Window
             // The first line contains the one-time local session URL; never print it in diagnostics.
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(25));
             var line = await _engine.StandardOutput.ReadLineAsync(timeout.Token);
+            if (_isClosing) { StopEngine(); return; }
             if (line is null || !line.StartsWith("OTS_SCAN_URL=", StringComparison.Ordinal))
                 throw new InvalidOperationException("Engine did not provide a local session URL.");
             var target = line["OTS_SCAN_URL=".Length..];
@@ -78,7 +115,9 @@ public partial class MainWindow : Window
                 "Ohana Tech Solutions", "Security Suite", "WebView2");
             Directory.CreateDirectory(profile);
             var env = await CoreWebView2Environment.CreateAsync(null, profile);
+            if (_isClosing) { StopEngine(); return; }
             await RepositoryBrowser.EnsureCoreWebView2Async(env);
+            if (_isClosing) { StopEngine(); return; }
             RepositoryBrowser.CoreWebView2.Settings.AreDevToolsEnabled = false;
             RepositoryBrowser.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
             RepositoryBrowser.CoreWebView2.Settings.IsWebMessageEnabled = false;
@@ -97,18 +136,11 @@ public partial class MainWindow : Window
             };
             RepositoryBrowser.Visibility = Visibility.Visible;
             RepositoryLoading.Visibility = Visibility.Collapsed;
+            RepositoryBrowser.CoreWebView2.NavigationCompleted += (_, e) => {
+                if (e.IsSuccess && !_isClosing)
+                    _ = LaunchRequestedRepositoryAsync();
+            };
             RepositoryBrowser.CoreWebView2.Navigate(target);
-            if (_launchRepository is { Length: > 0 })
-            {
-                // The scanner's own query handling is used; the external repo is never executed.
-                RepositoryBrowser.NavigationCompleted += (_, _) => {
-                    if (_launchRepository is null) return;
-                    var repo = _launchRepository;
-                    _launchRepository = null;
-                    _ = RepositoryBrowser.ExecuteScriptAsync("document.getElementById('repoUrl').value = " +
-                        System.Text.Json.JsonSerializer.Serialize(repo) + ";");
-                };
-            }
         }
         catch (Exception ex)
         {
@@ -128,6 +160,7 @@ public partial class MainWindow : Window
     {
         _isClosing = true;
         _scanCancellation?.Cancel();
+        _whiteAuditRunner.Cancel();
         StopEngine();
     }
     private void SetPanel(Grid selected)
@@ -145,13 +178,25 @@ public partial class MainWindow : Window
         var d = new OpenFolderDialog { Title = "Choose a local repository for W.H.I.T.E." };
         if (d.ShowDialog(this) == true) WhiteFolder.Text = d.FolderName;
     }
+    private void CancelWhiteAudit(object sender, RoutedEventArgs e)
+    {
+        if (!_whiteAuditRunner.IsRunning) return;
+        WhiteStatus.Text = "Cancelling audit...";
+        _whiteAuditRunner.Cancel();
+    }
+
     private async void RunWhiteAudit(object sender, RoutedEventArgs e)
     {
+        if (_whiteAuditRunner.IsRunning) return;
         var target = WhiteFolder.Text.Trim();
         if (!Directory.Exists(target)) { WhiteStatus.Text = "Choose an existing local repository folder."; return; }
         string binary = Path.Combine(_engineDirectory, "OTSWhiteAudit.exe");
         if (!File.Exists(binary)) { WhiteStatus.Text = "W.H.I.T.E. audit engine missing from installation."; return; }
+
+        _lastWhiteOutput = null;
+        WhiteOutput.Clear();
         WhiteRun.IsEnabled = false;
+        WhiteCancel.IsEnabled = true;
         WhiteStatus.Text = "Auditing source and configuration...";
         try
         {
@@ -164,52 +209,139 @@ public partial class MainWindow : Window
             psi.ArgumentList.Add("--format"); psi.ArgumentList.Add("json");
             if (HistoryScan.IsChecked == true) psi.ArgumentList.Add("--history");
             if (DependencyScan.IsChecked != true) psi.ArgumentList.Add("--no-sca");
-            using var process = Process.Start(psi) ?? throw new InvalidOperationException("Audit engine could not start.");
-            using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(12));
-            var stdout = process.StandardOutput.ReadToEndAsync(timeout.Token);
-            var stderr = process.StandardError.ReadToEndAsync(timeout.Token);
-            await process.WaitForExitAsync(timeout.Token);
-            _lastWhiteOutput = await stdout;
-            var err = await stderr;
-            WhiteOutput.Text = _lastWhiteOutput;
-            WhiteStatus.Text = process.ExitCode switch {
-                0 => "Audit completed · no findings at the configured failure threshold",
-                1 => "Audit completed · findings require review",
-                2 => "Audit incomplete · review the report and configuration",
-                _ => "Audit exited with status " + process.ExitCode
-            };
-            if (string.IsNullOrWhiteSpace(_lastWhiteOutput)) WhiteOutput.Text = err;
+
+            var execution = await _whiteAuditRunner.RunAsync(psi, TimeSpan.FromMinutes(12));
+            if (_isClosing) return;
+            if (execution.ExitCode is not (0 or 1 or 2))
+            {
+                WhiteStatus.Text = "Audit engine failed (exit " + execution.ExitCode + "); no report is exportable.";
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(execution.StandardOutput))
+            {
+                WhiteStatus.Text = "Audit returned no JSON report. Check the audit configuration and retry.";
+                return;
+            }
+            var assessment = WhiteAuditReportValidator.Assess(execution.StandardOutput, execution.ExitCode);
+            _lastWhiteOutput = execution.StandardOutput;
+            WhiteOutput.Text = execution.StandardOutput;
+            WhiteStatus.Text = !assessment.Complete
+                ? "Audit incomplete · review failed checks/errors before trusting any findings"
+                : execution.ExitCode == 1
+                    ? $"Audit completed · {assessment.FindingCount} findings require review"
+                    : assessment.FindingCount > 0
+                        ? $"Audit completed · {assessment.FindingCount} findings below the configured failure threshold"
+                        : "Audit completed · no findings from the enabled checks";
         }
-        catch (Exception ex) { WhiteStatus.Text = "Audit could not finish: " + ex.Message; }
-        finally { WhiteRun.IsEnabled = true; }
+        catch (TimeoutException) { if (!_isClosing) WhiteStatus.Text = "Audit timed out after 12 minutes; termination requested."; }
+        catch (OperationCanceledException) { if (!_isClosing) WhiteStatus.Text = "Audit cancelled; termination requested."; }
+        catch (Exception ex) { if (!_isClosing) WhiteStatus.Text = "Audit could not finish: " + ex.Message; }
+        finally
+        {
+            if (!_isClosing)
+            {
+                WhiteRun.IsEnabled = true;
+                WhiteCancel.IsEnabled = false;
+            }
+        }
     }
+
+    private void ImportWhiteReport(object sender, RoutedEventArgs e)
+    {
+        if (!WhiteRun.IsEnabled)
+        {
+            WhiteStatus.Text = "Cancel or finish the active audit before importing a report.";
+            return;
+        }
+        var dialog = new OpenFileDialog {
+            Filter = "OTS W.H.I.T.E. JSON reports|*.json",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog(this) != true) return; // Keep previous report on cancel.
+        try
+        {
+            var imported = WhiteReportReader.Read(dialog.FileName);
+            // Commit UI state only after bounded UTF-8 and strict schema checks.
+            _lastWhiteOutput = imported.Json;
+            WhiteOutput.Text = imported.Json;
+            WhiteStatus.Text = $"IMPORTED / UNVERIFIED · {imported.Assessment.FindingCount} reported findings. " +
+                "This file was not freshly audited. Inspect its origin before trusting it.";
+        }
+        catch (Exception ex)
+        {
+            WhiteStatus.Text = "Report import refused: " + ex.Message;
+            // Preserve previous exportable report and its displayed JSON.
+        }
+    }
+
     private void ExportWhiteReport(object sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrEmpty(_lastWhiteOutput)) { WhiteStatus.Text = "Run an audit before exporting."; return; }
-        var dialog = new SaveFileDialog { Filter = "JSON report|*.json", FileName = "OTS-White-Audit.json" };
-        if (dialog.ShowDialog(this) == true) File.WriteAllText(dialog.FileName, _lastWhiteOutput, Encoding.UTF8);
+        if (string.IsNullOrEmpty(_lastWhiteOutput))
+        {
+            WhiteStatus.Text = "Run an audit before exporting.";
+            return;
+        }
+        var dialog = new SaveFileDialog {
+            Filter = "JSON report|*.json", DefaultExt = ".json",
+            FileName = "OTS-White-Audit.json", OverwritePrompt = true
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            WhiteReportWriter.Save(dialog.FileName, _lastWhiteOutput);
+            WhiteStatus.Text = "Report saved to the selected file.";
+        }
+        catch (Exception ex)
+        {
+            WhiteStatus.Text = "Could not save report: " + ex.Message;
+        }
     }
 
     private async void RunQuick(object sender, RoutedEventArgs e) => await RunSystemScan(ScanMode.Quick);
     private async void RunDeep(object sender, RoutedEventArgs e) => await RunSystemScan(ScanMode.Deep);
+    private void CancelSystemScan(object sender, RoutedEventArgs e)
+    {
+        if (_scanCancellation is not { IsCancellationRequested: false }) return;
+        SystemStatus.Text = "Cancelling Windows inspection...";
+        SystemCancel.IsEnabled = false;
+        _scanCancellation.Cancel();
+    }
     private async Task RunSystemScan(ScanMode mode)
     {
-        _scanCancellation?.Cancel();
-        _scanCancellation = new CancellationTokenSource();
+        if (!QuickButton.IsEnabled || !DeepButton.IsEnabled) return;
+        using var cancellation = new CancellationTokenSource();
+        _scanCancellation = cancellation;
         QuickButton.IsEnabled = DeepButton.IsEnabled = false;
+        SystemCancel.IsEnabled = true;
+        SystemFindings.ItemsSource = null; // Never reuse stale findings for a new scan.
         SystemStatus.Text = mode == ScanMode.Quick ? "Quick scan started..." : "Deep scan started...";
-        var progress = new Progress<ScanProgress>(p => { if (!_isClosing) SystemStatus.Text =
+        var progress = new Progress<ScanProgress>(p => { if (!_isClosing && !cancellation.IsCancellationRequested) SystemStatus.Text =
             $"{p.Phase} · {p.Files:N0} files reviewed · {p.Skipped:N0} inaccessible"; });
         try
         {
-            var result = await ThreatScanner.RunAsync(mode, progress, _scanCancellation.Token);
+            var result = await ThreatScanner.RunAsync(mode, progress, cancellation.Token);
+            if (_isClosing) return;
+            if (result.Cancelled || cancellation.IsCancellationRequested)
+            {
+                SystemStatus.Text = $"Scan cancelled · {result.Files:N0} files reviewed before cancellation.";
+                return;
+            }
             SystemFindings.ItemsSource = result.Findings;
             SystemStatus.Text = $"Scan finished · {result.Files:N0} files · {result.Findings.Count} findings · " +
                 $"{result.Skipped} inaccessible · {result.Elapsed:g}";
         }
-        catch (OperationCanceledException) { SystemStatus.Text = "Scan cancelled."; }
-        catch (Exception ex) { SystemStatus.Text = "Scan failed: " + ex.Message; }
-        finally { QuickButton.IsEnabled = DeepButton.IsEnabled = true; }
+        catch (OperationCanceledException) { if (!_isClosing) SystemStatus.Text = "Scan cancelled."; }
+        catch (Exception ex) { if (!_isClosing) SystemStatus.Text = "Scan failed: " + ex.Message; }
+        finally
+        {
+            if (ReferenceEquals(_scanCancellation, cancellation)) _scanCancellation = null;
+            if (!_isClosing)
+            {
+                QuickButton.IsEnabled = DeepButton.IsEnabled = true;
+                SystemCancel.IsEnabled = false;
+            }
+        }
     }
     private async void RunDefender(object sender, RoutedEventArgs e)
     {
@@ -243,13 +375,30 @@ public partial class MainWindow : Window
         catch (Exception ex) { SystemStatus.Text = "Quarantine failed: " + ex.Message; }
     }
     private void RefreshQuarantine(object sender, RoutedEventArgs e) => RefreshVault();
-    private void RefreshVault() => QuarantineItems.ItemsSource = _quarantine.List();
+    private void RefreshVault()
+    {
+        _reviewed.Clear(); // Never reuse approval after contents of the vault change.
+        try
+        {
+            QuarantineItems.ItemsSource = _quarantine.List();
+        }
+        catch (IOException ex)
+        {
+            QuarantineItems.ItemsSource = null;
+            CleanupStatus.Text = "Quarantine listing unavailable: " + ex.Message;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            QuarantineItems.ItemsSource = null;
+            CleanupStatus.Text = "Quarantine access denied: " + ex.Message;
+        }
+    }
     private void InvestigateQuarantined(object sender, RoutedEventArgs e)
     {
         if (QuarantineItems.SelectedItem is not QuarantinedFile item) return;
         MessageBox.Show(this, ThreatInvestigator.QuarantineReport(item), "Quarantine review",
             MessageBoxButton.OK, MessageBoxImage.Information);
-        _reviewed.Add(item.Id);
+        _reviewed.Add(QuarantineVaultRegistry.ReviewIdentity(item));
     }
     private void RestoreQuarantined(object sender, RoutedEventArgs e)
     {
@@ -262,10 +411,10 @@ public partial class MainWindow : Window
     private void DestroyQuarantined(object sender, RoutedEventArgs e)
     {
         if (QuarantineItems.SelectedItem is not QuarantinedFile item) return;
-        if (!_reviewed.Contains(item.Id)) { CleanupStatus.Text = "Review the selected quarantine item before destroying it."; return; }
+        if (!_reviewed.Contains(QuarantineVaultRegistry.ReviewIdentity(item))) { CleanupStatus.Text = "Review the selected quarantine item before destroying it."; return; }
         if (MessageBox.Show(this, "PERMANENTLY destroy this reviewed quarantine item? This cannot be undone.\n"+item.OriginalPath,
             "Permanent removal", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-        try { _quarantine.Destroy(item); _reviewed.Remove(item.Id); RefreshVault(); CleanupStatus.Text = "Reviewed quarantine item removed."; }
+        try { _quarantine.Destroy(item); _reviewed.Remove(QuarantineVaultRegistry.ReviewIdentity(item)); RefreshVault(); CleanupStatus.Text = "Reviewed quarantine item removed."; }
         catch (Exception ex) { CleanupStatus.Text = "Removal failed: " + ex.Message; }
     }
     private void DiscoverCleanup(object sender, RoutedEventArgs e)

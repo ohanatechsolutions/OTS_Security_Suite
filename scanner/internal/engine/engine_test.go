@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -47,5 +49,25 @@ func TestLimit(t *testing.T) {
 	Finalize(r)
 	if r.FilesPartial != 1 || r.FilesSkipped != 0 {
 		t.Fatal("oversized file should be explicitly partially inspected, not silently skipped")
+	}
+}
+
+func TestScanDirContextCancelPreventsRead(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "fixture.txt"), []byte("benign"), 0600); err != nil { t.Fatal(err) }
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	report, err := ScanDirContext(ctx, root)
+	if !errors.Is(err, context.Canceled) || report != nil {
+		t.Fatalf("cancelled folder scan must not return a completed report: report=%v err=%v", report, err)
+	}
+}
+
+func TestRemoteContextCancelPreventsNetwork(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	report, err := ScanRemoteContext(ctx, "https://github.com/example/fixture")
+	if !errors.Is(err, context.Canceled) || report != nil {
+		t.Fatalf("cancelled network scan must not start or return a report: report=%v err=%v", report, err)
 	}
 }

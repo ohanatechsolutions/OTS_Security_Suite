@@ -1,7 +1,28 @@
 'use strict';
 const $=id=>document.getElementById(id);
-let currentReport=null, currentMode='repo';
+let currentReport=null, currentMode='repo', activeScan=null;
 const categories=['Code execution','Data exfiltration','Credential theft','Obfuscation','Supply chain','Persistence','Web vulnerabilities','Host control','Embedded payload','File integrity','Document threats','Test signatures'];
+// The placeholder allows pasting github.com/... directly. Canonicalize only
+// public HTTPS root repository URLs; the Go backend rechecks the same boundary.
+function normalizeRepositoryInput(input){
+ const raw=String(input??'').trim();
+ if(!raw)return '';
+ const full=/^(github\.com|www\.github\.com|bitbucket\.org)\//i.test(raw)
+   ? 'https://'+raw : raw;
+ try{
+  const uri=new URL(full);
+  const host=uri.hostname.toLowerCase()==='www.github.com'
+    ? 'github.com' : uri.hostname.toLowerCase();
+  if(uri.protocol!=='https:' || !['github.com','bitbucket.org'].includes(host) ||
+     uri.username || uri.password || uri.port || uri.search || uri.hash)return '';
+  const parts=uri.pathname.split('/').filter(Boolean);
+  if(parts.length!==2 || !parts.every(x=>/^[a-z0-9_.-]{1,100}$/i.test(x) &&
+      x!=='.' && x!=='..' && !x.includes('..')))return '';
+  const repo=parts[1].replace(/\.git$/i,'');
+  if(!repo || !/^[a-z0-9_.-]{1,100}$/i.test(repo))return '';
+  return 'https://'+host+'/'+parts[0]+'/'+repo;
+ }catch{return ''}
+}
 const escapeHTML=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const show=(id,yes=true)=>$(id).classList.toggle('hidden',!yes);
 const active=(cls,node)=>{document.querySelectorAll('.'+cls).forEach(x=>x.classList.toggle('active',x===node));};
@@ -13,22 +34,41 @@ async function api(path,options={}){
 document.querySelectorAll('.navitem').forEach(btn=>btn.addEventListener('click',()=>{active('navitem',btn);document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id===btn.dataset.tab));if(btn.dataset.tab==='history')loadHistory();}));
 document.querySelectorAll('.scan-mode').forEach(btn=>btn.addEventListener('click',()=>{active('scan-mode',btn);currentMode=btn.dataset.mode;document.querySelectorAll('.mode').forEach(x=>show(x.id,x.id===currentMode+'-mode'));}));
 async function scan(mode){
+ if(activeScan)return;
+ const controller=new AbortController();activeScan=controller;currentReport=null;$('cancelScan').disabled=false;
  show('error',false);show('status');show('empty',false);show('results',false);$('statusText').textContent='Scanning... A large repository may take a minute.';
  document.querySelectorAll('.primary').forEach(x=>x.disabled=true);
  try{
   let report;
   if(mode==='repo'||mode==='folder'){
-    let body=mode==='repo'?{url:$('repoUrl').value.trim()}:{folder:$('folderPath').value.trim()};
-    if(!Object.values(body)[0])throw new Error('Please enter a repository URL or folder path.');
-    report=await api('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const input=mode==='repo' ? $('repoUrl').value.trim() : $('folderPath').value.trim();
+    const canonical=mode==='repo' ? normalizeRepositoryInput(input) : input;
+    if(!canonical)throw new Error(mode==='repo'
+      ? 'Enter a public root GitHub or Bitbucket repository URL (HTTPS only).'
+      : 'Please enter a local file or folder path.');
+    if(mode==='repo')$('repoUrl').value=canonical;
+    const body=mode==='repo'?{url:canonical}:{folder:canonical};
+    report=await api('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller.signal});
   }else{
     const files=Array.from((mode==='file'?$('fileUpload'):$('folderUpload')).files);if(!files.length)throw new Error('Choose files or a folder first.');
     const form=new FormData();for(const file of files){form.append('files',file,file.webkitRelativePath||file.name);}
-    report=await api('/api/scan-upload',{method:'POST',body:form});
+    report=await api('/api/scan-upload',{method:'POST',body:form,signal:controller.signal});
   }
   render(report);
- }catch(err){show('error');$('error').textContent=err.message;show('empty',true);}finally{show('status',false);document.querySelectorAll('.primary').forEach(x=>x.disabled=false);}
+ }catch(err){
+  show('error');$('error').textContent=(controller.signal.aborted||err.name==='AbortError')?'Scan cancelled. No completed report was saved.':err.message;
+  show('empty',true);
+ }finally{
+  if(activeScan===controller)activeScan=null;
+  show('status',false);document.querySelectorAll('.primary').forEach(x=>x.disabled=false);
+ }
 }
+$('cancelScan').addEventListener('click',()=>{
+ if(!activeScan)return;
+ $('statusText').textContent='Cancelling scan…';
+ $('cancelScan').disabled=true;
+ activeScan.abort();
+});
 $('scanRepo').onclick=()=>scan('repo');$('scanFolder').onclick=()=>scan('folder');$('scanUpload').onclick=()=>scan('upload');$('scanFiles').onclick=()=>scan('file');
 function render(report){
  currentReport=report;show('results');show('empty',false);

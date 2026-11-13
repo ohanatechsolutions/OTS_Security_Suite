@@ -4,6 +4,12 @@
 
 This is the first integrated development build of three OTS projects. It **is not yet approved for public release**. Source is organized for a single Windows installer; it preserves the existing component codebases and quarantine format rather than replacing them with a new unvalidated implementation.
 
+## Latest engineering verification (unreleased)
+
+**Last verified engineering-code commit:** `ba7562b41e7ec1abda69406fc0b1a235993e3df7` — [Windows CI #43414634076](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43414634076) **SUCCESS**, Windows runner. Actual logs: Go tests/vet and scanner build PASS; Chrome popup contracts **13/13 PASS**; embedded RepoScan URL normalization **17/17 PASS**; offline W.H.I.T.E. source/history audit **172 worktree files scanned, zero high/critical findings reported by the configured audit** (not an independent security certification); packaged WHITE checks PASS; 22/22 Windows C# process/report/quarantine tests PASS; Sanitizer tests PASS; native WPF publish PASS; Inno Setup package PASS; install/WPF UI Automation/second-launch handoff/normal close/repair/uninstall and synthetic user-vault retention PASS; source/submodule/compiler provenance manifest PASS. **Unsigned CI test installer SHA-256: `826DD311F59CAD0E4BEB7A2F1353921CD5C790D90577D73B5C99C40FF4C830AA`**. Artifact upload intentionally skipped on PR, no public signed release. Independent real-device QA, historical DPAPI recovery, Chrome clean-profile, publisher signing and final owner approval remain **NOT RUN/BLOCKED**.
+
+Follow the [one-page owner finish line](docs/OWNER_FINISH_LINE.md) for the exact remaining non-code steps. The repo's root distribution license, trusted publisher signature and final release decision require owner authorization; do not bypass these gates.
+
 ## Modules
 
 1. **Repository Security** — the independent Go scanner from OTS GitHub Malware Scanner v2.5. The local server is started on an ephemeral loopback port by the WPF host, is opened inside native WebView2, and is killed when the suite window closes. URL scanning retrieves public GitHub/Bitbucket snapshots; local-folder scanning requires no ScanRepo.dev backend. The Go engine has 95 heuristic rules and format-aware baseline inspection.
@@ -29,7 +35,7 @@ The native Windows icon and title-bar icon are both set to the user's supplied s
 
 ### Building on Windows
 
-You need .NET 10 SDK, Go 1.23+, Python 3.12, PyInstaller, Inno Setup 6, Microsoft WebView2 runtime, and the two Git submodules (both public).
+You need .NET 10 SDK, Go 1.27.4+ (security-maintained toolchain), Python 3.12, PyInstaller, Inno Setup 6, Microsoft WebView2 runtime, and the two Git submodules (both public).
 
 ```powershell
 git clone --recurse-submodules https://github.com/ohanatechsolutions/OTS_Security_Suite.git
@@ -62,4 +68,17 @@ The Windows quarantine system is user-scoped and cannot offer kernel-level malwa
 - `extension/`: locally launched repository scanner extension
 - `installer/`: Inno Setup packaging
 
-See [RELEASE-GATES](docs/RELEASE-GATES.md). This integration has not yet completed a Windows installer acceptance test or independent malware testing.
+See [BUILD_BLUEPRINT](docs/BUILD_BLUEPRINT.md), [PROJECT_STATUS](docs/PROJECT_STATUS.md), [TEST_EVIDENCE](docs/TEST_EVIDENCE.md) and [RELEASE-GATES](docs/RELEASE-GATES.md). An automated Windows CI installer launch/close and uninstall smoke **passed** for the draft branch; independent Win10/Win11, Chrome, quarantine/restore and malware corpus acceptance has **not** passed. No final publisher-signed release is available.
+
+### Draft branch build evidence — 2026-11-11 HST
+
+- Code commit `59243e6b15c6`, [GitHub Actions run 43172812782](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43172812782): **success** for Go tests/vet, 95 rule/12 category assertions, WHITE executable synthetic success/incomplete tests, 8/8 Windows process cancellation/timeout tests, Sanitizer smoke, WPF desktop build and launch/close, installer PE/hash/URI/uninstall.
+- Generated Inno Setup SHA-256: `389DBCFE20AE5CB29EAA4F17B5360DEF0DD14841FA4DE7F767301289AFABF092` for `OTS-Security-Suite-Setup-x64.exe`. **Not uploaded/published from the PR**.
+- Chrome extension uses `activeTab` only and has no permanent host permissions. Manifest/JS checks passed in CI; clean Chrome profile testing remains.
+- UI startup default is 1300×800 DIPs clamped to work area, but human DPI/taskbar verification still required.
+- Go scanner count refers to 95 regex heuristic rules across eight categories plus four built-in detection categories; the count is not a guarantee of malware detection quality.
+- **Status: integration beta, NOT approved for public release.** Existing standalone tools and encrypted quarantine remain preserved.
+
+### Historical engineering candidate
+
+Source `a2f39b812e61116ecaa3f4813909b662d4149224` adds true RepoScan cancel propagation; local API origin/connection/resource-limit tests; current-and-legacy encrypted quarantine registry, precise destruction-review authorization; JSON report contract checks; stable Windows taskbar AppUserModelID; PNG transparency pixel check; installed extension and license notices; WPF UI Automation; and patched Go 1.27.4. [Current Windows CI](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43189027296) **PASSED** at docs head `de277e5fa3bb2d7e1bd8b2aac362a3d9e74ff916` with 15/15 audit/vault tests, real WPF synthetic UI, logo alpha verification, Go security tests, installer/URI/uninstall and preserved vault data. Installer SHA-256 `8872BB5E2039C7B5F6AA13EA7AC52276CB22C80AA88B00FCDEE6271B5BC1C929` (CI-only, unsigned). No installer artifact from this draft PR is uploaded or released; manual Win10/11, Chrome and signing gates remain open.

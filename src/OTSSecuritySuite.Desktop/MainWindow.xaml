@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="OTS Security Suite · Ohana Tech Solutions" Icon="AppIcon.ico"
-        Width="1280" Height="860" MinWidth="900" MinHeight="650"
+        Width="1300" Height="800" MinWidth="900" MinHeight="650"
         WindowStartupLocation="CenterScreen" Closing="OnWindowClosing" Loaded="OnWindowLoaded">
   <Grid>
     <Grid.RowDefinitions><RowDefinition Height="96"/><RowDefinition Height="*"/><RowDefinition Height="35"/></Grid.RowDefinitions>
@@ -49,7 +49,7 @@
             <TextBlock Text="LOCAL GIT REPOSITORY FOLDER" Foreground="#B5C9B8" Margin="0,0,0,6"/>
             <DockPanel><Button DockPanel.Dock="Right" Click="BrowseWhiteFolder" Content="BROWSE..."/><TextBox x:Name="WhiteFolder" Text="" Margin="0,0,8,8"/></DockPanel>
             <WrapPanel><CheckBox Name="HistoryScan" Content="Scan Git history"/><CheckBox Name="DependencyScan" Content="Dependency CVEs (requires OSV offline cache)"/></WrapPanel>
-            <WrapPanel Margin="0,12,0,0"><Button Click="RunWhiteAudit" Name="WhiteRun" Content="RUN CODE SECURITY AUDIT ▶" Foreground="#39FF14"/><Button Click="ExportWhiteReport" Content="EXPORT REPORT"/></WrapPanel>
+            <WrapPanel Margin="0,12,0,0"><Button Click="RunWhiteAudit" Name="WhiteRun" Content="RUN CODE SECURITY AUDIT ▶" Foreground="#39FF14"/><Button Click="CancelWhiteAudit" Name="WhiteCancel" Content="CANCEL AUDIT" IsEnabled="False"/><Button Click="ImportWhiteReport" Name="WhiteImport" Content="IMPORT REPORT"/><Button Click="ExportWhiteReport" Content="EXPORT REPORT"/></WrapPanel>
           </StackPanel>
           <TextBlock Grid.Row="2" x:Name="WhiteStatus" Text="Secrets · SAST · Git history · offline dependency audit" Foreground="#9AC4A3" Margin="0,10,0,12"/>
           <TextBox Grid.Row="3" Name="WhiteOutput" TextWrapping="Wrap" FontFamily="Consolas" IsReadOnly="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
@@ -57,7 +57,7 @@
         <Grid Name="SystemPanel" Visibility="Collapsed">
           <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
           <TextBlock Grid.Row="0" Text="WINDOWS THREAT &amp; PERSISTENCE INSPECTION" Foreground="#39FF14" FontWeight="Bold" FontSize="18" Margin="0,0,0,16"/>
-          <WrapPanel Grid.Row="1"><Button Name="QuickButton" Click="RunQuick" Content="QUICK SCAN"/><Button Name="DeepButton" Click="RunDeep" Content="DEEP SCAN"/><Button Click="RunDefender" Content="REQUEST DEFENDER SCAN"/><Button Click="OpenSanitizer" Content="OPEN FULL SANITIZER"/></WrapPanel>
+          <WrapPanel Grid.Row="1"><Button Name="QuickButton" Click="RunQuick" Content="QUICK SCAN"/><Button Name="DeepButton" Click="RunDeep" Content="DEEP SCAN"/><Button Name="SystemCancel" Click="CancelSystemScan" Content="CANCEL SCAN" IsEnabled="False"/><Button Click="RunDefender" Content="REQUEST DEFENDER SCAN"/><Button Click="OpenSanitizer" Content="OPEN FULL SANITIZER"/></WrapPanel>
           <TextBlock Grid.Row="2" Name="SystemStatus" Foreground="#A9CCA9" Text="System inspection is read-only. Destructive actions require confirmation." Margin="0,14,0,12" TextWrapping="Wrap"/>
           <ListView Grid.Row="3" Name="SystemFindings" SelectionMode="Single" >
             <ListView.View><GridView><GridViewColumn Header="Severity" DisplayMemberBinding="{Binding Severity}" Width="90"/><GridViewColumn Header="Finding" DisplayMemberBinding="{Binding Title}" Width="220"/><GridViewColumn Header="Location" DisplayMemberBinding="{Binding Path}" Width="430"/></GridView></ListView.View>

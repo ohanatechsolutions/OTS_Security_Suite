@@ -23,8 +23,8 @@
     </div>
     <div class="feature-strip"><span><b>95</b> DETECTION RULES</span><span><b>12</b> RISK CATEGORIES</span><span><b>0–100</b> RISK SCORE</span><span><b>LOCAL</b> ANALYSIS</span></div>
     </div>
-    <div class="status hidden" id="status"><span class="spinner"></span><span id="statusText">Scanning…</span></div>
-    <div class="error hidden" id="error"></div>
+    <div class="status hidden" id="status" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span id="statusText">Scanning…</span><button type="button" class="secondary" id="cancelScan">CANCEL SCAN</button></div>
+    <div class="error hidden" id="error" role="alert" aria-live="assertive"></div>
     <section id="results" class="hidden results-wrap">
       <div class="section-heading"><div><p class="eyebrow">SCAN REPORT // 01</p><h2 id="resultTarget"></h2></div><button class="secondary" id="export">↓ EXPORT JSON</button></div>
       <div class="stats"><div class="stat score"><small>RISK SCORE</small><div id="resultScore">0<span>/100</span></div><b id="resultVerdict">LOW RISK</b></div><div class="stat"><small>FILES INSPECTED</small><div id="filesScanned">0</div><p id="filesSkipped">0 uninspected</p></div><div class="stat"><small>FINDINGS</small><div id="findingCount">0</div><p id="coverage">Detection matches</p></div><div class="stat"><small>ACTIVE RULES</small><div id="ruleCount">95</div><p>Local analysis checks</p></div></div>
@@ -36,6 +36,6 @@
   </section>
   <section id="history" class="panel secondary-panel"><p class="eyebrow">LOCAL REPORTS // 02</p><h2>SCAN HISTORY<span class="cursor">_</span></h2><p class="subtitle">Previous reports, stored on this computer.</p><div id="historyList" class="history-list"></div></section>
   <section id="about" class="panel secondary-panel"><p class="eyebrow">THE ENGINE // 03</p><h2>ABOUT OTS SCANNER<span class="cursor">_</span></h2><div class="about-card"><h3>INDEPENDENT LOCAL ANALYSIS</h3><p>Built by Ohana Tech Solutions. OTS GitHub Malware Scanner is independently developed, is not affiliated with ScanRepo, and does not require its services.</p><p>Supported scans inspect source files and file signatures without executing untrusted code. For each report, file coverage details identify which checks completed and which content could not be fully inspected. Static indicators help identify patterns; they are not a guarantee of safety.</p><h3>PRIVACY & SECURITY</h3><p>Local folder scans stay on this computer. Public repository scans retrieve snapshots from GitHub or Bitbucket. Reports are stored locally. The interface runs on a loopback connection with session authorization.</p></div></section>
-  <footer><span>© 2026 OHANA TECH SOLUTIONS</span><span>GITHUB MALWARE SCANNER // LOCAL EDITION</span><span>V2.4.0</span></footer>
+  <footer><span>© 2026 OHANA TECH SOLUTIONS</span><span>GITHUB MALWARE SCANNER // LOCAL EDITION</span><span>REPOSCAN V2.5.0</span></footer>
  </main>
 </div><script src="/app.js"></script></body></html>

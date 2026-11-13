@@ -25,8 +25,8 @@ RestartApplications=no
 Source: "..\bundle\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Icons]
-Name: "{userdesktop}\OTS Security Suite"; Filename: "{app}\OTSSecuritySuite.exe"; WorkingDir: "{app}"; IconFilename: "{app}\OTSSecuritySuite.exe"; Tasks: desktopicon
-Name: "{autoprograms}\OTS Security Suite"; Filename: "{app}\OTSSecuritySuite.exe"; WorkingDir: "{app}"; IconFilename: "{app}\OTSSecuritySuite.exe"
+Name: "{userdesktop}\OTS Security Suite"; Filename: "{app}\OTSSecuritySuite.exe"; WorkingDir: "{app}"; IconFilename: "{app}\OTSSecuritySuite.exe"; Tasks: desktopicon; AppUserModelID: "OhanaTechSolutions.OTSSecuritySuite"
+Name: "{autoprograms}\OTS Security Suite"; Filename: "{app}\OTSSecuritySuite.exe"; WorkingDir: "{app}"; IconFilename: "{app}\OTSSecuritySuite.exe"; AppUserModelID: "OhanaTechSolutions.OTSSecuritySuite"
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: checkedonce

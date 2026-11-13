@@ -16,6 +16,34 @@ import (
 
 const MaxArchiveBytes = 60 << 20
 
+// Cap decompressed archive sizes before tar.Reader skips unread file bytes.
+// A tiny compressed tar.gz can otherwise expand to a denial-of-service workload.
+const MaxRemoteUnpackedBytes int64 = 192 << 20
+
+// Includes TAR headers, padding and metadata entries (including PAX and GNU
+// extension records, which tar.Reader can consume before returning a file).
+const MaxRemoteDecompressedStreamBytes int64 = MaxRemoteUnpackedBytes + (64 << 20)
+
+// exhaustedStreamReader returns ErrCoverage rather than io.EOF at the
+// configured decompression limit. TAR parsers treat io.EOF as successful
+// archive termination, which would hide uninspected metadata or entries.
+type exhaustedStreamReader struct {
+    reader io.Reader
+    remaining int64
+}
+
+func (r *exhaustedStreamReader) Read(p []byte) (int, error) {
+    if r.remaining <= 0 {
+        return 0, ErrCoverage
+    }
+    if int64(len(p)) > r.remaining {
+        p = p[:int(r.remaining)]
+    }
+    n, err := r.reader.Read(p)
+    r.remaining -= int64(n)
+    return n, err
+}
+
 var ownerRepo = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,100}$`)
 
 // ParseRepo intentionally rejects private domains and unexpected URL paths (SSRF protection).
@@ -36,8 +64,8 @@ func ParseRepo(input string) (host, owner, repo string, err error) {
 		return "", "", "", errors.New("only github.com and bitbucket.org are supported")
 	}
 	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
-	if len(parts) < 2 {
-		return "", "", "", errors.New("expected owner/repo URL")
+	if len(parts) != 2 || u.RawQuery != "" || u.Fragment != "" {
+		return "", "", "", errors.New("expected a root owner/repo URL without a branch, file, query or fragment")
 	}
 	owner = parts[0]
 	repo = strings.TrimSuffix(parts[1], ".git")
@@ -51,11 +79,18 @@ func ParseRepo(input string) (host, owner, repo string, err error) {
 }
 
 func ScanRemote(input string) (*Report, error) {
+	return ScanRemoteContext(context.Background(), input)
+}
+
+// ScanRemoteContext ties remote provider downloads to the authenticated scan
+// request: browser cancellation closes the outbound network request too.
+func ScanRemoteContext(parent context.Context, input string) (*Report, error) {
+	if err := parent.Err(); err != nil { return nil, err }
 	host, owner, repo, err := ParseRepo(input)
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+	ctx, cancel := context.WithTimeout(parent, 100*time.Second)
 	defer cancel()
 	var download string
 	if host == "github.com" {
@@ -93,27 +128,45 @@ func ScanRemote(input string) (*Report, error) {
 	if res.ContentLength > MaxArchiveBytes {
 		return nil, errors.New("repository snapshot is larger than 60 MB")
 	}
-	// Limit compressed bytes, then reject archives that cannot terminate within bound.
-	compressed := io.LimitReader(res.Body, MaxArchiveBytes+1)
+	report := NewReport("https://"+host+"/"+owner+"/"+repo, "public repository")
+	if err := scanRemoteArchiveContext(ctx, res.Body, report); err != nil {
+		return nil, err
+	}
+	return report, nil
+}
+
+// scanRemoteArchive is isolated so resource-safety limits can be verified using
+// synthetic tarballs without contacting public repository providers.
+func scanRemoteArchive(body io.Reader, report *Report) error {
+	return scanRemoteArchiveContext(context.Background(), body, report)
+}
+
+func scanRemoteArchiveContext(ctx context.Context, body io.Reader, report *Report) error {
+	if err := ctx.Err(); err != nil { return err }
+	compressed := io.LimitReader(body, MaxArchiveBytes+1)
 	gz, err := gzip.NewReader(compressed)
 	if err != nil {
-		return nil, fmt.Errorf("invalid repository archive: %w", err)
+		return fmt.Errorf("invalid repository archive: %w", err)
 	}
 	defer gz.Close()
-	tr := tar.NewReader(gz)
-	report := NewReport("https://"+host+"/"+owner+"/"+repo, "public repository")
+	// Guard the complete decompressed byte stream, not just regular-file sizes;
+	// malicious metadata can otherwise cause unbounded decompression.
+	tr := tar.NewReader(&exhaustedStreamReader{reader: gz, remaining: MaxRemoteDecompressedStreamBytes})
 	entries := 0
+	var unpackedBytes int64
 	for {
+		if err := ctx.Err(); err != nil { return err }
 		hdr, e := tr.Next()
 		if e == io.EOF {
 			break
 		}
 		if e != nil {
-			return nil, fmt.Errorf("invalid tar archive: %w", e)
+			return fmt.Errorf("invalid tar archive: %w", e)
 		}
 		entries++
-		if entries > 50000 {
+		if entries > MaxArchiveEntries {
 			report.Truncated = true
+			report.warn("Stopped remote archive inspection at the maximum entry count.")
 			break
 		}
 		if hdr.Typeflag != tar.TypeReg && hdr.Typeflag != tar.TypeRegA {
@@ -121,11 +174,11 @@ func ScanRemote(input string) (*Report, error) {
 				report.Uninspected(hdr.Name, "repository archive link not followed", false, 0)
 			}
 			continue
-		} // never follow links / execute files
+		} // Never follow links or execute files.
 		name := hdr.Name
 		if i := strings.IndexByte(name, '/'); i >= 0 {
 			name = name[i+1:]
-		} // strip archive commit prefix
+		} // Strip archive commit prefix.
 		if name == "" {
 			continue
 		}
@@ -133,7 +186,13 @@ func ScanRemote(input string) (*Report, error) {
 			report.Uninspected(name, "invalid repository archive size", false, hdr.Size)
 			continue
 		}
-		// Do not skip based on extension. A size limit gives partial coverage, not silence.
+		if hdr.Size > MaxRemoteUnpackedBytes-unpackedBytes {
+			report.Uninspected(name, "remote archive decompression budget exceeded", false, hdr.Size)
+			report.warn("Remote archive exceeds the decompression budget; remaining entries were not inspected.")
+			report.Truncated = true
+			break
+		}
+		unpackedBytes += hdr.Size
 		if report.BytesScanned >= MaxTotalBytes || report.FilesSeen+report.EmbeddedSeen >= MaxFiles {
 			report.Uninspected(name, "scan-wide resource limit reached", false, hdr.Size)
 			continue
@@ -143,10 +202,11 @@ func ScanRemote(input string) (*Report, error) {
 			report.Uninspected(name, "could not read repository file", false, hdr.Size)
 			continue
 		}
+		if err := ctx.Err(); err != nil { return err }
 		ScanFile(report, name, data, hdr.Size, false, 0)
-
 	}
-	report.warn("A source archive represents one revision; it does not include Git history, submodule contents, or Git LFS binary content unless bundled. These require separate collection.")
+	if err := ctx.Err(); err != nil { return err }
+	report.warn("A source archive represents one revision; it excludes Git history, linked submodules and Git LFS payloads unless included.")
 	Finalize(report)
-	return report, nil
+	return nil
 }

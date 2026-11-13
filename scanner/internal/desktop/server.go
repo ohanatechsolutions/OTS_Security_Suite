@@ -1,6 +1,8 @@
 package desktop
 
 import (
+	"context"
+	"errors"
 	"crypto/rand"
 	"crypto/subtle"
 	"embed"
@@ -27,6 +29,10 @@ var assets embed.FS
 const Addr = "127.0.0.1:48728"
 
 var idPattern = regexp.MustCompile(`^\d{10,24}$`)
+
+// History is local user-controlled data; never trust an on-disk JSON file's
+// basename, claimed ID, type, or byte count without revalidation.
+const maxStoredReportBytes int64 = 32 << 20
 
 type Server struct {
 	secret        string
@@ -83,7 +89,13 @@ func (s *Server) Start() (string, error) {
 	mux.HandleFunc("/api/report/", s.withAuth(s.report))
 	mux.HandleFunc("/api/quit", s.withAuth(s.quit))
 	mux.HandleFunc("/api/window-heartbeat", s.withAuth(s.windowHeartbeat))
-	s.web = &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	s.web = &http.Server{
+		ReadHeaderTimeout: 8 * time.Second,
+		ReadTimeout: 120 * time.Second,
+		WriteTimeout: 180 * time.Second,
+		IdleTimeout: 25 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Host != s.actualAddress {
 			http.Error(w, "invalid host", 403)
 			return
@@ -204,11 +216,26 @@ func (s *Server) busyStart() bool {
 	return true
 }
 func (s *Server) busyEnd() { s.mu.Lock(); s.busy = false; s.mu.Unlock() }
-func (s *Server) save(report *engine.Report) {
-	b, err := engine.ReportJSON(report)
-	if err == nil {
-		_ = os.WriteFile(filepath.Join(s.reportsDir, report.ID+".json"), b, 0600)
+func (s *Server) save(report *engine.Report) error {
+	// An invalid ID must never control a report path.
+	if report == nil || !idPattern.MatchString(report.ID) {
+		return errors.New("invalid report identifier")
 	}
+	data, err := engine.ReportJSON(report)
+	if err != nil { return err }
+	if int64(len(data)) > maxStoredReportBytes {
+		return errors.New("report too large for validated local history; scan coverage must be reduced")
+	}
+	tmp, err := os.CreateTemp(s.reportsDir, ".ots-report-*.tmp")
+	if err != nil { return err }
+	stage := tmp.Name()
+	defer os.Remove(stage)
+	if err = tmp.Chmod(0600); err != nil { tmp.Close(); return err }
+	if _, err = tmp.Write(data); err != nil { tmp.Close(); return err }
+	if err = tmp.Sync(); err != nil { tmp.Close(); return err }
+	if err = tmp.Close(); err != nil { return err }
+	// A complete report becomes visible to history and export together.
+	return os.Rename(stage, filepath.Join(s.reportsDir, report.ID+".json"))
 }
 func (s *Server) scan(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
@@ -232,18 +259,25 @@ func (s *Server) scan(w http.ResponseWriter, r *http.Request) {
 	var report *engine.Report
 	var err error
 	if strings.TrimSpace(req.URL) != "" {
-		report, err = engine.ScanRemote(req.URL)
+		report, err = engine.ScanRemoteContext(r.Context(), req.URL)
 	} else if strings.TrimSpace(req.Folder) != "" {
-		report, err = engine.ScanDir(req.Folder)
+		report, err = engine.ScanDirContext(r.Context(), req.Folder)
 	} else {
 		http.Error(w, "specify URL or folder", 400)
 		return
 	}
 	if err != nil {
+		// The originating UI may already have disconnected. Never persist a
+		// partial/cancelled scan as a successful report.
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) { return }
 		http.Error(w, err.Error(), 400)
 		return
 	}
-	s.save(report)
+	if r.Context().Err() != nil { return }
+	if err := s.save(report); err != nil {
+		http.Error(w, "Could not save local scan report. Check available disk space and folder permissions.", http.StatusInsufficientStorage)
+		return
+	}
 	writeJSON(w, report)
 }
 func (s *Server) scanUpload(w http.ResponseWriter, r *http.Request) {
@@ -265,6 +299,7 @@ func (s *Server) scanUpload(w http.ResponseWriter, r *http.Request) {
 	report := engine.NewReport("Browser-selected local folder", "local folder (browser upload)")
 	count := 0
 	for {
+		if r.Context().Err() != nil { return }
 		part, e := reader.NextPart()
 		if e == io.EOF {
 			break
@@ -293,12 +328,48 @@ func (s *Server) scanUpload(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "folder upload read error", 400)
 			return
 		}
+		if r.Context().Err() != nil { return }
 		engine.ScanBytes(report, name, data)
 	}
+	if r.Context().Err() != nil { return }
 	engine.Finalize(report)
-	s.save(report)
+	if r.Context().Err() != nil { return }
+	if err := s.save(report); err != nil {
+		http.Error(w, "Could not save local scan report. Check available disk space and folder permissions.", http.StatusInsufficientStorage)
+		return
+	}
 	writeJSON(w, report)
 }
+func (s *Server) readStoredReport(id string) ([]byte, *engine.Report, error) {
+	if !idPattern.MatchString(id) {
+		return nil, nil, errors.New("invalid report identifier")
+	}
+	filename := filepath.Join(s.reportsDir, id+".json")
+	info, err := os.Lstat(filename)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > maxStoredReportBytes {
+		return nil, nil, errors.New("invalid report file type or size")
+	}
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer file.Close()
+	data, err := io.ReadAll(io.LimitReader(file, maxStoredReportBytes+1))
+	if err != nil || int64(len(data)) > maxStoredReportBytes {
+		return nil, nil, errors.New("report exceeds storage read limit")
+	}
+	var parsed engine.Report
+	if json.Unmarshal(data, &parsed) != nil || parsed.ID != id ||
+		parsed.ID == "" || parsed.Engine == "" || parsed.Target == "" ||
+		parsed.RulesAvailable <= 0 {
+		return nil, nil, errors.New("local report metadata does not match filename")
+	}
+	return data, &parsed, nil
+}
+
 func (s *Server) history(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "GET required", 405)
@@ -327,14 +398,8 @@ func (s *Server) history(w http.ResponseWriter, r *http.Request) {
 		if !idPattern.MatchString(id) {
 			continue
 		}
-		b, err := os.ReadFile(filepath.Join(s.reportsDir, e.Name()))
-		if err != nil {
-			continue
-		}
-		var item engine.Report
-		if json.Unmarshal(b, &item) != nil {
-			continue
-		}
+		_, item, err := s.readStoredReport(id)
+		if err != nil { continue }
 		out = append(out, summary{item.ID, item.Target, item.Date, item.Score, item.Verdict, len(item.Findings)})
 	}
 	writeJSON(w, out)
@@ -349,12 +414,13 @@ func (s *Server) report(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid report ID", 400)
 		return
 	}
-	b, err := os.ReadFile(filepath.Join(s.reportsDir, id+".json"))
+	b, _, err := s.readStoredReport(id)
 	if err != nil {
-		http.Error(w, "not found", 404)
+		http.Error(w, "report missing or invalid", 404)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
 	if r.URL.Query().Get("download") == "1" {
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=OTS-Scan-%s.json", id))
 	}
