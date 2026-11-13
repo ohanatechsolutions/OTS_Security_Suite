@@ -2,6 +2,12 @@
 
 Current status: **INTEGRATION PREVIEW — LATEST WINDOWS CI PASS; INDEPENDENT QA AND SIGNED PUBLIC RELEASE NO-GO**.
 
+## Verified latest engineering candidate — 2026-11-13
+
+**Last verified engineering-code commit:** `ba7562b41e7ec1abda69406fc0b1a235993e3df7` — [Windows CI #43414634076](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43414634076) **SUCCESS**, Windows runner. Actual logs: Go tests/vet and scanner build PASS; Chrome popup contracts **13/13 PASS**; embedded RepoScan URL normalization **17/17 PASS**; offline W.H.I.T.E. source/history audit **172 worktree files scanned, zero high/critical findings reported by the configured audit** (not an independent security certification); packaged WHITE checks PASS; 22/22 Windows C# process/report/quarantine tests PASS; Sanitizer tests PASS; native WPF publish PASS; Inno Setup package PASS; install/WPF UI Automation/second-launch handoff/normal close/repair/uninstall and synthetic user-vault retention PASS; source/submodule/compiler provenance manifest PASS. **Unsigned CI test installer SHA-256: `826DD311F59CAD0E4BEB7A2F1353921CD5C790D90577D73B5C99C40FF4C830AA`**. Artifact upload intentionally skipped on PR, no public signed release. Independent real-device QA, historical DPAPI recovery, Chrome clean-profile, publisher signing and final owner approval remain **NOT RUN/BLOCKED**.
+
+**Current branch release state:** DRAFT PR #2, main untouched, public release **NO-GO**. Earlier test runs and SHA-256 values below are historical evidence for different commits; they are not interchangeable with this binary. A future manually dispatched Actions test artifact will have its own hash and must be verified against its own SHA256SUMS.
+
 **2026-11-11 (HST) governance:** Baseline main `d45de9592345` has successful GitHub Windows CI [run #7](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43132451936). This is **not** evidence that the M1 feature branch is buildable or user-installable. Current source/requirements, actual checks, and open decisions are recorded in [BUILD_BLUEPRINT](BUILD_BLUEPRINT.md), [PROJECT_STATUS](PROJECT_STATUS.md), and [TEST_EVIDENCE](TEST_EVIDENCE.md).
 
 **Current candidate evidence:** [Windows CI run 43172812782](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43172812782) PASS at `59243e6b15c6` with 8/8 audit-process tests, real WPF launch/close, bundled scanner/WHITE/Sanitizer checks, Inno EXE PE header, SHA-256, protocol registration and uninstall. Installer was not uploaded on the PR. See [TEST_EVIDENCE](TEST_EVIDENCE.md) E-013–E-021.  
@@ -60,4 +66,4 @@ Never turn an incomplete scan into a clean malware verdict. Neither heuristics n
 - [x] Installed extension and pinned MIT/license/notice files presence PASS; suite source/license distribution decision still OPEN.
 - [ ] Obtain authorized publisher certificate/signing process; do not infer legitimacy from Installed Apps publisher metadata.
 
-**Latest CI-generated installer hash, NOT PUBLISHED:** `8872BB5E2039C7B5F6AA13EA7AC52276CB22C80AA88B00FCDEE6271B5BC1C929`, source `a2f39b812e61116ecaa3f4813909b662d4149224`, Windows run [43189027296](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43189027296). The previous CI-generated hash belongs to an older build and must not be used for this candidate.
+**Older CI-generated installer hash, NOT PUBLISHED (historical):** `8872BB5E2039C7B5F6AA13EA7AC52276CB22C80AA88B00FCDEE6271B5BC1C929`, source `a2f39b812e61116ecaa3f4813909b662d4149224`, Windows run [43189027296](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43189027296). The previous CI-generated hash belongs to an older build and must not be used for this candidate.

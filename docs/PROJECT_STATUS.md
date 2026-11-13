@@ -1,12 +1,18 @@
 # OTS Security Suite — Project Status / Resume Handoff
 
-**Updated:** 2026-11-11 (HST)  
+**Updated:** 2026-11-13 (HST)  
 **Repo:** `ohanatechsolutions/OTS_Security_Suite`  
 **Inspected baseline:** `main@d45de9592345e0b43acda4226004d72e2a181195`  
 **Active work branch:** `work/white-audit-lifecycle-and-blueprint-20261111`  
 **Draft PR:** [#2](https://github.com/ohanatechsolutions/OTS_Security_Suite/pull/2) — review only, not merged  
-**Overall:** **IN PROGRESS — current Windows automation PASS, independent release acceptance and signing still NO-GO**  
+**Overall:** **IN PROGRESS — latest Windows engineering automation PASS, real-device acceptance and signed public release NO-GO**  
 **Reference:** `BUILD_BLUEPRINT.md`, `TEST_EVIDENCE.md`, `RELEASE-GATES.md`.
+
+## Verified latest engineering candidate — 2026-11-13
+
+**Last verified engineering-code commit:** `ba7562b41e7ec1abda69406fc0b1a235993e3df7` — [Windows CI #43414634076](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43414634076) **SUCCESS**, Windows runner. Actual logs: Go tests/vet and scanner build PASS; Chrome popup contracts **13/13 PASS**; embedded RepoScan URL normalization **17/17 PASS**; offline W.H.I.T.E. source/history audit **172 worktree files scanned, zero high/critical findings reported by the configured audit** (not an independent security certification); packaged WHITE checks PASS; 22/22 Windows C# process/report/quarantine tests PASS; Sanitizer tests PASS; native WPF publish PASS; Inno Setup package PASS; install/WPF UI Automation/second-launch handoff/normal close/repair/uninstall and synthetic user-vault retention PASS; source/submodule/compiler provenance manifest PASS. **Unsigned CI test installer SHA-256: `826DD311F59CAD0E4BEB7A2F1353921CD5C790D90577D73B5C99C40FF4C830AA`**. Artifact upload intentionally skipped on PR, no public signed release. Independent real-device QA, historical DPAPI recovery, Chrome clean-profile, publisher signing and final owner approval remain **NOT RUN/BLOCKED**.
+
+**Current branch release state:** DRAFT PR #2, main untouched, public release **NO-GO**. Earlier test runs and SHA-256 values below are historical evidence for different commits; they are not interchangeable with this binary. A future manually dispatched Actions test artifact will have its own hash and must be verified against its own SHA256SUMS.
 
 ## Observed state vs claims
 - **Observed**: GitHub repository with write access, native WPF project, Go scanner source, Python/Windows submodule pins, Inno Setup definition, Chrome extension, Windows CI workflow and existing integration documentation.
@@ -14,7 +20,7 @@
 - **Observed for current review-branch code commit `59243e6b15c6`:** Windows CI [run 43172812782](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43172812782) PASS, Go tests/vet, Python manifest and extension syntax, 36 W.H.I.T.E. unit tests, packaged W.H.I.T.E. CLI good/incomplete JSON, Sanitizer smoke, eight audit-process regression tests, WPF compilation and real launch/window close, scanner session and 95-rule check, Inno installer PE check/hash, per-user install/URI/uninstall smoke. **Not inferred:** independent Win10/Win11 QA, GUI clicks/visual inspection, legacy-vault restoration, Defender permission safety, performance/security corpus and publisher signing remain NOT RUN.
 - **Constraint**: Chat runs on Linux without the Windows GUI/.NET toolchain, but an explicitly limited public-repository GitHub Actions Windows runner executed the above tests without added paid services. Public installer artifact upload from PR was skipped by design. Neither signed artifact nor public release exists.
 
-## Current verified automation candidate — a2f39b812e61116ecaa3f4813909b662d4149224
+## Historical verified automation candidate — a2f39b812e61116ecaa3f4813909b662d4149224
 
 **Current actual Windows CI evidence:** [run 43189027296](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43189027296) **SUCCESS** for docs head `de277e5fa3bb2d7e1bd8b2aac362a3d9e74ff916` containing executable source `a2f39b812e61116ecaa3f4813909b662d4149224`, with `Audit runner tests: 15/15 PASS`, packaged WHITE success/incomplete contract, 95 scanner rules and Go tests/vet, WPF synthetic navigation and real CLI execution, logo PNG sampled transparency (1563×1563), Inno installer, bundled MIT/license notices, extension files, synthetic vault preservation, URI registration, normal close and uninstall. Installer SHA-256 `8872BB5E2039C7B5F6AA13EA7AC52276CB22C80AA88B00FCDEE6271B5BC1C929` (CI-created, deliberately not uploaded on draft PR). **Automated gates passed; human Win10/Win11, clean Chrome extension, legacy real-user vault, independent security and publisher signing remain NOT RUN / blocked.**
 

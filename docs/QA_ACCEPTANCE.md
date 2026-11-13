@@ -2,6 +2,12 @@
 
 **Status: TEST PLAN, NOT SELF-CERTIFICATION.** Automated GitHub Windows CI is additional evidence; a CI smoke run does **not** certify a real user environment. Test in disposable Windows VMs or synthetic folders only. Preserve any existing encrypted vaults; no real deletion until specifically authorized.
 
+## Latest automated evidence
+
+**Last verified engineering-code commit:** `ba7562b41e7ec1abda69406fc0b1a235993e3df7` — [Windows CI #43414634076](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43414634076) **SUCCESS**, Windows runner. Actual logs: Go tests/vet and scanner build PASS; Chrome popup contracts **13/13 PASS**; embedded RepoScan URL normalization **17/17 PASS**; offline W.H.I.T.E. source/history audit **172 worktree files scanned, zero high/critical findings reported by the configured audit** (not an independent security certification); packaged WHITE checks PASS; 22/22 Windows C# process/report/quarantine tests PASS; Sanitizer tests PASS; native WPF publish PASS; Inno Setup package PASS; install/WPF UI Automation/second-launch handoff/normal close/repair/uninstall and synthetic user-vault retention PASS; source/submodule/compiler provenance manifest PASS. **Unsigned CI test installer SHA-256: `826DD311F59CAD0E4BEB7A2F1353921CD5C790D90577D73B5C99C40FF4C830AA`**. Artifact upload intentionally skipped on PR, no public signed release. Independent real-device QA, historical DPAPI recovery, Chrome clean-profile, publisher signing and final owner approval remain **NOT RUN/BLOCKED**.
+
+**Manual rows below remain NOT RUN** unless completed on an actual supported user machine by an identified reviewer. CI and synthetic DPAPI test success must never silently satisfy those rows.
+
 | Case | Environment | Procedure / expected result | Actual evidence | Status |
 |---|---|---|---|---|
 | QA-01 / REQ-001 | Windows 11 x64, 100% scaling | Install without admin; startup window centered and 1300×800 if possible, logo white on transparent, title/taskbar/Alt+Tab .ico matches app | — | NOT RUN |

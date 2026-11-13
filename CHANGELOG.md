@@ -31,6 +31,14 @@ All notable changes are recorded against the repository. This is an **unreleased
 
 Windows CI [run 43189027296](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43189027296) **PASS** at source `a2f39b812e61116ecaa3f4813909b662d4149224` / documentation head `de277e5fa3bb2d7e1bd8b2aac362a3d9e74ff916`: Go tests/vet, 15/15 WPF audit/report/vault regressions, synthetic native UI audit, PNG transparency, MIT notice packaging and user-vault-preserving uninstall. Installer SHA-256 `8872BB5E2039C7B5F6AA13EA7AC52276CB22C80AA88B00FCDEE6271B5BC1C929`. The PR artifact upload was intentionally skipped and no publisher-signed release exists.
 
+### Engineering hardening completed in the latest verified candidate
+
+- Validated and size-bounded local RepoScan history: reject mismatched filenames/IDs, malformed JSON, oversized files and unsafe local history before showing/exporting; atomically save only reports within that same size budget.
+- More forgiving GitHub/Bitbucket root input: accepts pasted owner/repository URLs without a scheme but canonicalizes strictly to public HTTPS root URLs; backend allowlist remains mandatory.
+- Added 10 harmless Go synthetic detection/benign fixtures and 17 browser-input normalization tests.
+- Bundled build manifest now fingerprints the actual Inno Setup compiler binary SHA-256; its PE version-resource field is recorded when available, not guessed.
+- Current Windows CI [#43414634076](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43414634076) passed 22/22 Windows regression cases, 13/13 extension checks, 17/17 embedded browser input checks, scope-limited WHITE source/history audit and all installed-app tests. Unsigned test-build hash `826DD311F59CAD0E4BEB7A2F1353921CD5C790D90577D73B5C99C40FF4C830AA`; no signed release.
+
 ### Known limits
 - Static heuristics are not a substitute for traditional endpoint antivirus/EDR.
 - Remote repository scans download a public snapshot; Git history, Git LFS and submodule objects need separate verification.

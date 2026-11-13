@@ -10,9 +10,11 @@
 | OTS W.H.I.T.E. | Secrets/SAST/history/offline SCA engine | Pinned `modules/OTS_WHITE` gitlink | Commit pinned in manifest, Python 3.12 build; intentionally offline |
 | OTS System Sanitizer | Windows inspections and DPAPI/AES quarantine | Pinned `modules/OTS_System_Sanitizer` gitlink | Commit pinned in manifest, .NET 10 Core, no external NuGet requirement in core csproj |
 | PyInstaller | Build-only Python CLI packager | `.github/workflows/windows-build.yml` | Pinned **6.22.3**; transitive build dependencies not yet recorded as a complete lockfile |
-| Inno Setup | Per-user Windows installer creator | `installer/OTS-Security-Suite.iss` and preinstalled Windows runner | Inno Setup 6 family, exact runner image minor version not pinned |
+| Inno Setup | Per-user Windows installer creator | `installer/OTS-Security-Suite.iss` and preinstalled Windows runner | Compiler's SHA-256 fingerprint and available PE file/product-version text captured in installed `BUILD-MANIFEST.json`; Windows runner image still may change |
 | Chrome MV3 companion | User-invoked repository URL handoff | `extension/manifest.json` | Native JS, `activeTab` only, no npm runtime dependency |
 | OSV-Scanner offline cache | Optional local dependency vulnerability scanning | W.H.I.T.E. CLI | **Not bundled**; missing offline tool/cache makes enabled SCA incomplete, not clean |
+
+**Latest provenance verification:** Windows CI [run 43414634076](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43414634076) passed after the bundled direct-component manifest was checked against the exact source, both Git submodules and the actual binary SHA-256 of the Inno Setup compiler. This fingerprint detects compiler drift; it is not a full transitive SBOM or a package signature.
 
 **Bundled licensing:** Pinned upstream MIT licenses, third-party notices and scanner notice are copied into `bundle/licenses/` and verified after installation. A root `LICENSE` for the integrated suite does not currently exist; **owner decision pending** (do not infer the root product has an approved open-source distribution license just because submodules are MIT).
 

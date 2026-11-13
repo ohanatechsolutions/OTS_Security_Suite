@@ -2,6 +2,10 @@
 
 **Status:** pre-release, no independent security certification or guaranteed malware prevention.
 
+## Current evidence and limitations
+
+The latest Windows CI [run #43414634076](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43414634076) passed its configured tests and completed the offline W.H.I.T.E. worktree/history source audit with no high/critical findings **under that scanner's rules**. It also verifies negative cases for RepoScan local report history, external origin rejection, cancellation and limited decompression. That does **not** amount to independent penetration testing, detection certification, vulnerability-free dependencies or authorization to distribute. Product/security owners still need to approve any release.
+
 ## Supported scope
 The draft integrated Windows 10/11 x64 application includes a Go static repository scanner, Python-based OTS W.H.I.T.E. source audit, and the .NET System Sanitizer. These tools report **heuristics and coverage**, not definitive infection status. Continue running Microsoft Defender or another approved endpoint protection product.
 

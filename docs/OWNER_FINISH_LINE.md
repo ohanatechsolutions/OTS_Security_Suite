@@ -2,6 +2,12 @@
 
 **Status:** Verified engineering preview; **NO-GO for signed public release** until the real-machine and publisher gates below. This is the short handoff: the repository contains the real code, tests, installer, security policy, and release tooling. No paid services, public release, branch deletion, or private-key access were performed.
 
+## What engineering has already verified
+
+**Last verified engineering-code commit:** `ba7562b41e7ec1abda69406fc0b1a235993e3df7` — [Windows CI #43414634076](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43414634076) **SUCCESS**, Windows runner. Actual logs: Go tests/vet and scanner build PASS; Chrome popup contracts **13/13 PASS**; embedded RepoScan URL normalization **17/17 PASS**; offline W.H.I.T.E. source/history audit **172 worktree files scanned, zero high/critical findings reported by the configured audit** (not an independent security certification); packaged WHITE checks PASS; 22/22 Windows C# process/report/quarantine tests PASS; Sanitizer tests PASS; native WPF publish PASS; Inno Setup package PASS; install/WPF UI Automation/second-launch handoff/normal close/repair/uninstall and synthetic user-vault retention PASS; source/submodule/compiler provenance manifest PASS. **Unsigned CI test installer SHA-256: `826DD311F59CAD0E4BEB7A2F1353921CD5C790D90577D73B5C99C40FF4C830AA`**. Artifact upload intentionally skipped on PR, no public signed release. Independent real-device QA, historical DPAPI recovery, Chrome clean-profile, publisher signing and final owner approval remain **NOT RUN/BLOCKED**.
+
+You do **not** need to edit or rewrite the code. The remaining steps below are real-machine acceptance, the licensing/signing decision, and explicit permission for any public release. A **new manually dispatched run** has its own checksum—do not reuse `826DD311F59CAD0E4BEB7A2F1353921CD5C790D90577D73B5C99C40FF4C830AA` for that later artifact.
+
 ## 1 — Download a private-use UNSIGNED test build
 
 1. Open [Windows build and integration checks](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/workflows/windows-build.yml).

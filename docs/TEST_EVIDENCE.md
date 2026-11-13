@@ -1,9 +1,27 @@
 # OTS Security Suite — Test Evidence (actual results only)
 
-**Updated:** 2026-11-11 (Pacific/Honolulu)  
+**Updated:** 2026-11-13 (Pacific/Honolulu)  
 **Baseline main commit:** `d45de9592345e0b43acda4226004d72e2a181195`  
 **Active branch:** `work/white-audit-lifecycle-and-blueprint-20261111`  
 **Environment:** Chat Linux session has no Windows/.NET GUI; code was tested on GitHub Actions `windows-latest` runner. See exact source SHA and workflow logs below. GitHub connector has repository write access.
+
+## E-031–E-039: scoped 2026-11-13 engineering verification
+
+**Last verified engineering-code commit:** `ba7562b41e7ec1abda69406fc0b1a235993e3df7` — [Windows CI #43414634076](https://github.com/ohanatechsolutions/OTS_Security_Suite/actions/runs/43414634076) **SUCCESS**, Windows runner. Actual logs: Go tests/vet and scanner build PASS; Chrome popup contracts **13/13 PASS**; embedded RepoScan URL normalization **17/17 PASS**; offline W.H.I.T.E. source/history audit **172 worktree files scanned, zero high/critical findings reported by the configured audit** (not an independent security certification); packaged WHITE checks PASS; 22/22 Windows C# process/report/quarantine tests PASS; Sanitizer tests PASS; native WPF publish PASS; Inno Setup package PASS; install/WPF UI Automation/second-launch handoff/normal close/repair/uninstall and synthetic user-vault retention PASS; source/submodule/compiler provenance manifest PASS. **Unsigned CI test installer SHA-256: `826DD311F59CAD0E4BEB7A2F1353921CD5C790D90577D73B5C99C40FF4C830AA`**. Artifact upload intentionally skipped on PR, no public signed release. Independent real-device QA, historical DPAPI recovery, Chrome clean-profile, publisher signing and final owner approval remain **NOT RUN/BLOCKED**.
+
+| ID | Requirement/gate | Actual recorded evidence | Status and limits |
+|---|---|---|---|
+| E-031 | REQ-002/003/014 | Go unit/vet and engine build on Windows; cancelled report, remote decompression budget and local HTTP security tests; corrupt/mismatched/oversized history rejected, bounded atomic save | **PASS CI**, real hostile corpus/third-party penetration test **NOT RUN** |
+| E-032 | REQ-004 | 10 synthetic detection/benign lookalike fixtures and existing 95-rule/12-category, 12-file full-inventory and archive tests | **PASS Go tests**, measured sensitivity/specificity and real malware families **NOT RUN** |
+| E-033 | REQ-003/012 | Chrome popup 13/13 contract and embedded RepoScan input canonicalization 17/17 tests | **PASS Node VM synthetic tests**, clean Chrome profile and real GUI Cancel click **NOT RUN** |
+| E-034 | REQ-005/013 | Offline WHITE source/history scanner completed on 172 source files with no high/critical matches under configured rules | **PASS CI scoped audit**; not a full dependency CVE scan, secret certification or external pentest |
+| E-035 | REQ-005/006/008/009/010/015/017 | 22/22 Windows C# subprocess, JSON, import, quarantine/DPAPI and synthetic cleanup tests | **PASS Windows CI**; real historical user profile/manual destructive denial tests **NOT RUN** |
+| E-036 | REQ-001/005/011 | Real packaged WPF started and UI Automation ran synthetic WHITE report; same-user second launch forwarded rather than duplicating scanner window | **PASS Windows CI**; actual DPI/taskbar and accessibility human review **NOT RUN** |
+| E-037 | REQ-011/013 | CI-only Inno PE installer; internal 64-char hash check; synthetic uninstall/repair, preserved quarantine canary, proper URI registration/removal; bundled extension/legal notices | **PASS Windows CI**; signed distribution and independent clean Win10/11 acceptance **NOT RUN** |
+| E-038 | REQ-011 | Bundle `BUILD-MANIFEST.json` matched checkout SHA, both submodule gitlinks, supported Go version, SHA-256 fingerprint of Inno compiler and direct component list | **PASS Windows CI**; full transitive signed SBOM **NOT RUN** |
+| E-039 | REQ-016 | Unsigned test installer SHA-256: `826DD311F59CAD0E4BEB7A2F1353921CD5C790D90577D73B5C99C40FF4C830AA`, run 43414634076; PR artifact intentionally SKIPPED | **PASS SHA only**; Authenticode signer and released asset **BLOCKED** |
+
+**Owner-only tasks:** see [OWNER_FINISH_LINE.md](OWNER_FINISH_LINE.md) and the [manual QA matrix](QA_ACCEPTANCE.md). No archive/history finding, rule count or successful build is evidence of an approved public release.
 
 ## Recorded evidence
 
