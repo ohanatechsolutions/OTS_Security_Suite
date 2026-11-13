@@ -51,7 +51,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Chrome extension JS syntax check failed' }
           node tools/test_extension.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Chrome popup security contract tests failed' }
-          foreach ($p in @('tools/sign-windows-release.ps1','tools/verify-windows-release.ps1','tools/collect-windows-qa.ps1')) {
+          foreach ($p in @('tools/sign-windows-release.ps1','tools/verify-windows-release.ps1','tools/collect-windows-qa.ps1','tools/generate-build-manifest.ps1')) {
             $tokens = $null; $parseErrors = $null
             [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p).Path,[ref]$tokens,[ref]$parseErrors) | Out-Null
             if ($parseErrors.Count -ne 0) { throw "Release-script parse failed: $p" }
@@ -191,6 +191,18 @@ jobs:
             if ((Get-Item -LiteralPath $pair[1]).Length -eq 0) { throw "Empty legal attribution: $($pair[1])" }
           }
           Write-Host 'All pinned module licenses and notices staged for installer'
+          & pwsh -NoProfile -File tools/generate-build-manifest.ps1 -OutputPath bundle/licenses/BUILD-MANIFEST.json
+          if ($LASTEXITCODE -ne 0) { throw 'Build manifest generation failed' }
+          $manifest = Get-Content -LiteralPath bundle/licenses/BUILD-MANIFEST.json -Raw | ConvertFrom-Json
+          $checkedOut = (git rev-parse HEAD).Trim()
+          if ($manifest.source.checked_out_commit -ne $checkedOut -or
+              $manifest.source.white_submodule_commit -ne (git -C modules/OTS_WHITE rev-parse HEAD).Trim() -or
+              $manifest.source.sanitizer_submodule_commit -ne (git -C modules/OTS_System_Sanitizer rev-parse HEAD).Trim() -or
+              $manifest.direct_components.Count -lt 6 -or
+              $manifest.toolchains.go -notmatch 'go1\.27\.4') {
+            throw 'Bundle manifest does not match the actual pinned source and toolchain'
+          }
+          Write-Host 'Source and dependency build provenance matches checked-out tree'
       - name: Inno Setup
         shell: pwsh
         run: |
@@ -253,7 +265,7 @@ jobs:
           $setup = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-') -Wait -PassThru
           if ($setup.ExitCode -ne 0) { throw "Silent setup failed: exit $($setup.ExitCode)" }
           $installPath = Join-Path $env:LOCALAPPDATA 'Programs/Ohana Tech Solutions/Security Suite'
-          foreach ($required in @('OTSSecuritySuite.exe','engines/OTSScannerEngine.exe','engines/OTSWhiteAudit.exe','engines/OTSSystemSanitizer.exe','extension/manifest.json','extension/popup.js','licenses/OTS_WHITE_LICENSE.txt','licenses/OTS_WHITE_THIRD_PARTY_NOTICES.md','licenses/OTS_System_Sanitizer_LICENSE.txt','licenses/OTS_System_Sanitizer_THIRD_PARTY_NOTICES.md','licenses/RepoScan_NOTICE.md')) {
+          foreach ($required in @('OTSSecuritySuite.exe','engines/OTSScannerEngine.exe','engines/OTSWhiteAudit.exe','engines/OTSSystemSanitizer.exe','extension/manifest.json','extension/popup.js','licenses/OTS_WHITE_LICENSE.txt','licenses/OTS_WHITE_THIRD_PARTY_NOTICES.md','licenses/OTS_System_Sanitizer_LICENSE.txt','licenses/OTS_System_Sanitizer_THIRD_PARTY_NOTICES.md','licenses/RepoScan_NOTICE.md','licenses/BUILD-MANIFEST.json')) {
             if (-not (Test-Path (Join-Path $installPath $required))) { throw "Installer missing $required" }
           }
           Add-Type -AssemblyName System.Drawing
