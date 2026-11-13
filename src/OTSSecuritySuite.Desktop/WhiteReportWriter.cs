@@ -50,6 +50,34 @@ public static class WhiteAuditReportValidator
     }
 }
 
+/// <summary>
+/// Read a user-selected local JSON report without trusting it as scan evidence.
+/// No network calls, execution, implicit export, or file modifications.
+/// </summary>
+public sealed record WhiteImportedReport(string Json, WhiteReportAssessment Assessment);
+
+public static class WhiteReportReader
+{
+    public const int MaxReportBytes = 16 << 20;
+
+    public static WhiteImportedReport Read(string selectedPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(selectedPath);
+        using var source = new FileStream(selectedPath, FileMode.Open, FileAccess.Read,
+            FileShare.Read, 8192, FileOptions.SequentialScan);
+        if (source.Length > MaxReportBytes)
+            throw new InvalidDataException("Imported report exceeds the 16 MiB safe limit.");
+        var bytes = new byte[checked((int)source.Length)];
+        source.ReadExactly(bytes);
+        if (source.ReadByte() != -1)
+            throw new InvalidDataException("Imported report changed while being read.");
+        var json = new UTF8Encoding(false, throwOnInvalidBytes: true)
+            .GetString(bytes).TrimStart('\uFEFF');
+        var assessment = WhiteAuditReportValidator.Assess(json, 0);
+        return new WhiteImportedReport(json, assessment);
+    }
+}
+
 public static class WhiteReportWriter
 {
     public static void Save(string selectedPath, string jsonReport)

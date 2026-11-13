@@ -25,6 +25,8 @@ var cases = new (string Name, Func<Task> Action)[]
     ("cleanup deletes only selected old temporary fixture", CleanupOnlySelected),
     ("cleanup refuses modified or recent synthetic fixtures", CleanupRejectsChangedAndRecent),
     ("cleanup rejects non-allowlisted locations and cache opt-in spoof", CleanupRejectsOutsideRoots),
+    ("WHITE import accepts bounded valid JSON but does not authenticate its origin", WhiteImportValid),
+    ("WHITE import rejects malformed, invalid UTF-8 and oversized files", WhiteImportRejectsUnsafe),
 };
 int passed = 0;
 foreach (var (name, action) in cases)
@@ -396,6 +398,45 @@ static Task CleanupRejectsOutsideRoots()
         Assert(result.Removed==0 && result.Failures.Count==2 && File.Exists(path),
             "Unapproved location was deleted");
     } finally { Directory.Delete(root,true); }
+    return Task.CompletedTask;
+}
+
+static Task WhiteImportValid()
+{
+    var path = Path.Combine(Path.GetTempPath(), "ots-white-import-" + Guid.NewGuid().ToString("N") + ".json");
+    const string report = "{\"tool\":\"OTS W.H.I.T.E.\",\"schema_version\":\"1.0\",\"complete\":true," +
+        "\"checks\":{\"secrets\":\"completed\",\"sca\":\"skipped\"},\"errors\":[],\"findings\":[{}]}";
+    try
+    {
+        File.WriteAllText(path, report);
+        var imported = WhiteReportReader.Read(path);
+        Assert(imported.Json == report, "Import modified the trusted JSON data unexpectedly");
+        Assert(imported.Assessment.FindingCount == 1, "Import lost finding count");
+        Assert(File.ReadAllText(path) == report, "Import modified the original report");
+    }
+    finally { File.Delete(path); }
+    return Task.CompletedTask;
+}
+
+static Task WhiteImportRejectsUnsafe()
+{
+    var path = Path.Combine(Path.GetTempPath(), "ots-white-import-" + Guid.NewGuid().ToString("N") + ".json");
+    try
+    {
+        File.WriteAllText(path, "{\"tool\":\"not white\"}");
+        try { WhiteReportReader.Read(path); throw new Exception("Wrong report schema accepted"); }
+        catch (InvalidDataException) { }
+
+        File.WriteAllBytes(path, new byte[] { 0xff, 0xfe, 0x80 });
+        try { WhiteReportReader.Read(path); throw new Exception("Invalid UTF-8 accepted"); }
+        catch (DecoderFallbackException) { }
+
+        using (var handle = new FileStream(path, FileMode.Open, FileAccess.Write))
+            handle.SetLength(WhiteReportReader.MaxReportBytes + 1L);
+        try { WhiteReportReader.Read(path); throw new Exception("Oversized report accepted"); }
+        catch (InvalidDataException) { }
+    }
+    finally { File.Delete(path); }
     return Task.CompletedTask;
 }
 

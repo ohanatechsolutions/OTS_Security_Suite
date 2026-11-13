@@ -246,6 +246,35 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ImportWhiteReport(object sender, RoutedEventArgs e)
+    {
+        if (!WhiteRun.IsEnabled)
+        {
+            WhiteStatus.Text = "Cancel or finish the active audit before importing a report.";
+            return;
+        }
+        var dialog = new OpenFileDialog {
+            Filter = "OTS W.H.I.T.E. JSON reports|*.json",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog(this) != true) return; // Keep previous report on cancel.
+        try
+        {
+            var imported = WhiteReportReader.Read(dialog.FileName);
+            // Commit UI state only after bounded UTF-8 and strict schema checks.
+            _lastWhiteOutput = imported.Json;
+            WhiteOutput.Text = imported.Json;
+            WhiteStatus.Text = $"IMPORTED / UNVERIFIED · {imported.Assessment.FindingCount} reported findings. " +
+                "This file was not freshly audited. Inspect its origin before trusting it.";
+        }
+        catch (Exception ex)
+        {
+            WhiteStatus.Text = "Report import refused: " + ex.Message;
+            // Preserve previous exportable report and its displayed JSON.
+        }
+    }
+
     private void ExportWhiteReport(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrEmpty(_lastWhiteOutput))

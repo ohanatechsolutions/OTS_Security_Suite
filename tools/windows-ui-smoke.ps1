@@ -43,6 +43,8 @@ try {
     $folderValue = $folder.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
     $folderValue.SetValue($fixture)
 
+    $importControl = Get-Ui 'WhiteImport'
+    if (-not $importControl.Current.IsEnabled) { throw 'Import report control was unexpectedly disabled' }
     Click-Ui 'WhiteRun'
     $status = Get-Ui 'WhiteStatus'
     $finished = $false
