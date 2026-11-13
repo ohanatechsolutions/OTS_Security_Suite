@@ -27,6 +27,12 @@ try {
     $pip= @(& python -m pip show pyinstaller)
     $installerVersion= (($pip | Where-Object { $_ -match '^Version:\s+' } | Select-Object -First 1) -replace '^Version:\s+','').Trim()
     if(-not $installerVersion){throw 'PyInstaller packaging version not discoverable.'}
+    $innoCompiler=Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+    if(-not [IO.File]::Exists($innoCompiler)){throw 'Inno Setup 6 compiler is unavailable.'}
+    $innoVersion=([IO.FileInfo]$innoCompiler).VersionInfo.FileVersion
+    if(-not $innoVersion -or $innoVersion -notmatch '^6\.'){
+        throw 'Inno Setup 6 compiler version could not be verified.'
+    }
 
     $components=@(
         [ordered]@{ name='OTSSecuritySuite.Desktop'; type='WPF app'; version=$suiteVersion;
@@ -39,7 +45,8 @@ try {
             source='modules/OTS_WHITE' },
         [ordered]@{ name='OTS System Sanitizer'; type='.NET submodule'; commit=$sanitizer;
             source='modules/OTS_System_Sanitizer' },
-        [ordered]@{ name='PyInstaller'; type='build-only packaging'; version=$installerVersion }
+        [ordered]@{ name='PyInstaller'; type='build-only packaging'; version=$installerVersion },
+        [ordered]@{ name='Inno Setup'; type='build-only Windows compiler'; version=$innoVersion }
     )
 
     $manifest=[ordered]@{
@@ -54,7 +61,7 @@ try {
         product=[ordered]@{name='OTS Security Suite'; version=$suiteVersion;
             target='win-x64'; stage='unsigned integration preview'}
         toolchains=[ordered]@{go=$go; dotnet_sdk=$net; python=$python;
-            pyinstaller=$installerVersion}
+            pyinstaller=$installerVersion; inno_setup=$innoVersion}
         direct_components=$components
         evidence_scope='Direct components and build tools only; NOT a full transitive SBOM or vulnerability certification.'
         separate_dependencies=@('Microsoft Edge WebView2 Runtime on target Windows machine',

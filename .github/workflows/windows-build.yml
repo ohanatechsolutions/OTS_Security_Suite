@@ -204,7 +204,8 @@ jobs:
               $manifest.source.white_submodule_commit -ne (git -C modules/OTS_WHITE rev-parse HEAD).Trim() -or
               $manifest.source.sanitizer_submodule_commit -ne (git -C modules/OTS_System_Sanitizer rev-parse HEAD).Trim() -or
               $manifest.direct_components.Count -lt 6 -or
-              $manifest.toolchains.go -notmatch 'go1\.27\.4') {
+              $manifest.toolchains.go -notmatch 'go1\.27\.4' -or
+              $manifest.toolchains.inno_setup -notmatch '^6\.') {
             throw 'Bundle manifest does not match the actual pinned source and toolchain'
           }
           Write-Host 'Source and dependency build provenance matches checked-out tree'
