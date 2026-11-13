@@ -212,11 +212,23 @@ func (s *Server) busyStart() bool {
 	return true
 }
 func (s *Server) busyEnd() { s.mu.Lock(); s.busy = false; s.mu.Unlock() }
-func (s *Server) save(report *engine.Report) {
-	b, err := engine.ReportJSON(report)
-	if err == nil {
-		_ = os.WriteFile(filepath.Join(s.reportsDir, report.ID+".json"), b, 0600)
+func (s *Server) save(report *engine.Report) error {
+	// An invalid ID must never control a report path.
+	if report == nil || !idPattern.MatchString(report.ID) {
+		return errors.New("invalid report identifier")
 	}
+	data, err := engine.ReportJSON(report)
+	if err != nil { return err }
+	tmp, err := os.CreateTemp(s.reportsDir, ".ots-report-*.tmp")
+	if err != nil { return err }
+	stage := tmp.Name()
+	defer os.Remove(stage)
+	if err = tmp.Chmod(0600); err != nil { tmp.Close(); return err }
+	if _, err = tmp.Write(data); err != nil { tmp.Close(); return err }
+	if err = tmp.Sync(); err != nil { tmp.Close(); return err }
+	if err = tmp.Close(); err != nil { return err }
+	// A complete report becomes visible to history and export together.
+	return os.Rename(stage, filepath.Join(s.reportsDir, report.ID+".json"))
 }
 func (s *Server) scan(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
@@ -255,7 +267,11 @@ func (s *Server) scan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Context().Err() != nil { return }
-	s.save(report)
+	if r.Context().Err() != nil { return }
+	if err := s.save(report); err != nil {
+		http.Error(w, "Could not save local scan report. Check available disk space and folder permissions.", http.StatusInsufficientStorage)
+		return
+	}
 	writeJSON(w, report)
 }
 func (s *Server) scanUpload(w http.ResponseWriter, r *http.Request) {
@@ -311,7 +327,11 @@ func (s *Server) scanUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Context().Err() != nil { return }
 	engine.Finalize(report)
-	s.save(report)
+	if r.Context().Err() != nil { return }
+	if err := s.save(report); err != nil {
+		http.Error(w, "Could not save local scan report. Check available disk space and folder permissions.", http.StatusInsufficientStorage)
+		return
+	}
 	writeJSON(w, report)
 }
 func (s *Server) history(w http.ResponseWriter, r *http.Request) {

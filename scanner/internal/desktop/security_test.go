@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"ots/github-malware-scanner/internal/engine"
 )
 
 func newSecurityFixture(t *testing.T) *Server {
@@ -98,4 +100,47 @@ func TestServerEnforcesConnectionLimits(t *testing.T) {
 		s.web.WriteTimeout <= 0 || s.web.MaxHeaderBytes > 1<<20 {
 		t.Fatalf("unsafe unbounded HTTP server limits: %+v", s.web)
 	}
+}
+
+// File errors must not return an apparently successful scan whose export
+// endpoint and history would later fail.
+func TestFailedReportPersistenceFailsClosed(t *testing.T) {
+	s := newSecurityFixture(t)
+	s.reportsDir = filepath.Join(t.TempDir(), "missing-folder")
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "benign.py"), []byte("print('fixture')"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	input, _ := json.Marshal(map[string]string{"folder": root})
+	req := requestWithCookie(http.MethodPost,
+		"http://127.0.0.1:54321/api/scan", string(input), s.secret, "http://127.0.0.1:54321")
+	response := httptest.NewRecorder()
+	s.withAuth(s.scan)(response, req)
+	if response.Code != http.StatusInsufficientStorage {
+		t.Fatalf("expected HTTP 507 storage error, got %d %s", response.Code, response.Body.String())
+	}
+	if s.busy { t.Fatal("failed report persistence left scanner permanently busy") }
+	if strings.Contains(response.Body.String(), root) {
+		t.Fatal("error body leaked local source directory")
+	}
+}
+
+func TestSavedReportAtomicAndRejectsUnsafeIdentifiers(t *testing.T) {
+	s := newSecurityFixture(t)
+	record := engine.NewReport("synthetic-only", "local fixture")
+	if err := s.save(record); err != nil { t.Fatal(err) }
+	files, err := os.ReadDir(s.reportsDir)
+	if err != nil || len(files) != 1 || files[0].Name() != record.ID+".json" {
+		t.Fatalf("atomic save left temp/unexpected files: %v %v", files, err)
+	}
+	data, err := os.ReadFile(filepath.Join(s.reportsDir, record.ID+".json"))
+	if err != nil { t.Fatal(err) }
+	var parsed engine.Report
+	if err := json.Unmarshal(data, &parsed); err != nil || parsed.ID != record.ID {
+		t.Fatalf("invalid stored JSON: %v", err)
+	}
+	record.ID = "../escape"
+	if err := s.save(record); err == nil { t.Fatal("unsafe report identifier was accepted") }
+	files, err = os.ReadDir(s.reportsDir)
+	if err != nil || len(files) != 1 { t.Fatalf("failed save modified history: %v %v", files, err) }
 }
